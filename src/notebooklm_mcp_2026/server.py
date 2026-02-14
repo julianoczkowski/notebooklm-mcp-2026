@@ -1,4 +1,4 @@
-"""MCP server and CLI entry point for notebook-julian.
+"""MCP server and CLI entry point for notebooklm-mcp-2026.
 
 The server exposes 9 tools via the Model Context Protocol over stdio
 transport. No running HTTP server is required — MCP clients launch
@@ -6,8 +6,8 @@ this as a subprocess.
 
 CLI usage::
 
-    notebook-julian serve   # Start MCP server (default)
-    notebook-julian login   # Interactive Chrome login
+    notebooklm-mcp-2026 serve   # Start MCP server (default)
+    notebooklm-mcp-2026 login   # Interactive Chrome login
 """
 
 from __future__ import annotations
@@ -44,7 +44,7 @@ def get_client() -> NotebookLMClient:
         tokens = load_tokens()
         if tokens is None:
             raise ValueError(
-                "Not authenticated. Run 'notebook-julian login' in your terminal first."
+                "Not authenticated. Run 'notebooklm-mcp-2026 login' in your terminal first."
             )
         _client = NotebookLMClient(
             cookies=tokens.cookies,
@@ -67,11 +67,11 @@ def reset_client() -> None:
 # ---------------------------------------------------------------------------
 
 mcp = FastMCP(
-    name="notebook-julian",
+    name="notebooklm-mcp-2026",
     instructions=(
         "NotebookLM MCP Server — query Google NotebookLM notebooks for context.\n\n"
         "If you get authentication errors, ask the user to run "
-        "'notebook-julian login' in their terminal.\n\n"
+        "'notebooklm-mcp-2026 login' in their terminal.\n\n"
         "Typical workflow:\n"
         "1. list_notebooks — find the notebook ID\n"
         "2. list_sources — see what sources are in it\n"
@@ -98,9 +98,9 @@ _register_tools()
 
 
 def main() -> None:
-    """CLI entry point (``notebook-julian`` command)."""
+    """CLI entry point (``notebooklm-mcp-2026`` command)."""
     parser = argparse.ArgumentParser(
-        prog="notebook-julian",
+        prog="notebooklm-mcp-2026",
         description="Secure MCP server for querying Google NotebookLM notebooks.",
     )
     subparsers = parser.add_subparsers(dest="command")
@@ -128,7 +128,7 @@ def main() -> None:
     if args.command == "login":
         _handle_login(args.timeout)
     elif args.command == "version":
-        print(f"notebook-julian {__version__}")
+        print(f"notebooklm-mcp-2026 {__version__}")
     else:
         # Default to serve (even with no subcommand)
         debug = getattr(args, "debug", False)
@@ -156,10 +156,10 @@ def _handle_login(timeout: int) -> None:
         if tokens.session_id:
             print(f"Session ID: extracted")
         print()
-        print("You can now use notebook-julian as an MCP server.")
+        print("You can now use notebooklm-mcp-2026 as an MCP server.")
         print("Add it to your MCP client config:")
         print()
-        print('  {"command": "notebook-julian", "args": ["serve"]}')
+        print('  {"command": "notebooklm-mcp-2026", "args": ["serve"]}')
     except Exception as e:
         print(f"\nLogin failed: {e}", file=sys.stderr)
         sys.exit(1)

@@ -31,7 +31,7 @@ from .config import (
     STORAGE_DIR,
 )
 
-logger = logging.getLogger("notebook_julian.auth")
+logger = logging.getLogger("notebooklm_mcp_2026.auth")
 
 NOTEBOOKLM_URL = "https://notebooklm.google.com/"
 CDP_PORT_START = 9222

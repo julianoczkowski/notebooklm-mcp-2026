@@ -1,4 +1,4 @@
-"""MCP tool definitions for notebook-julian."""
+"""MCP tool definitions for notebooklm-mcp-2026."""
 
 from .auth_tools import check_auth, login
 from .notebooks import get_notebook, list_notebooks

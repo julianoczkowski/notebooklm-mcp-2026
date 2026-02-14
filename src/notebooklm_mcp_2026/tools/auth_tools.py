@@ -54,7 +54,7 @@ def check_auth() -> dict[str, Any]:
     if tokens is None:
         return {
             "status": "not_authenticated",
-            "message": "No saved credentials found. Run 'notebook-julian login' first.",
+            "message": "No saved credentials found. Run 'notebooklm-mcp-2026 login' first.",
         }
 
     # Try to validate by refreshing the CSRF token
@@ -79,7 +79,7 @@ def check_auth() -> dict[str, Any]:
         return {
             "status": "expired",
             "message": str(e),
-            "hint": "Run 'notebook-julian login' to re-authenticate.",
+            "hint": "Run 'notebooklm-mcp-2026 login' to re-authenticate.",
         }
     except Exception as e:
         return {

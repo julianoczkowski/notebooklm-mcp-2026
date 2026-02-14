@@ -5,7 +5,7 @@ import urllib.parse
 
 import pytest
 
-from notebook_julian.protocol import (
+from notebooklm_mcp_2026.protocol import (
     AuthExpiredError,
     build_query_body,
     build_query_url,

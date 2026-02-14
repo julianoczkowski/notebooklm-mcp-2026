@@ -95,7 +95,7 @@ Authentication via Chrome DevTools Protocol:
    - Cleanup Chrome in `finally`
 
 2. **Credential storage**: `save_tokens()` / `load_tokens()`
-   - JSON file at `~/.local/share/notebook-julian/auth.json`
+   - JSON file at `~/.local/share/notebooklm-mcp-2026/auth.json`
    - File permissions: `0o600`
    - Directory permissions: `0o700`
 
@@ -124,7 +124,7 @@ Authentication via Chrome DevTools Protocol:
 FastMCP server with stdio transport:
 - Registers all 9 tools from `tools/` subpackage
 - Global `get_client()` singleton (lazy initialization from cached tokens)
-- CLI: `notebook-julian serve` (default), `notebook-julian login`, `notebook-julian version`
+- CLI: `notebooklm-mcp-2026 serve` (default), `notebooklm-mcp-2026 login`, `notebooklm-mcp-2026 version`
 
 ### `tools/`
 Each tool function:
@@ -196,6 +196,6 @@ JSON-RPC response → MCP Client → User sees the answer
 
 ### Chrome lifecycle
 - Launched with minimal flags (no extensions, no first-run)
-- Profile isolated to notebook-julian directory
+- Profile isolated to notebooklm-mcp-2026 directory
 - Always terminated in `finally` blocks
 - `atexit` handler as safety net

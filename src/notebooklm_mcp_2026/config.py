@@ -1,4 +1,4 @@
-"""Configuration, paths, and constants for notebook-julian.
+"""Configuration, paths, and constants for notebooklm-mcp-2026.
 
 All constants are centralized here. No other module should hardcode
 API URLs, RPC IDs, headers, or timeouts.
@@ -14,7 +14,7 @@ from platformdirs import user_data_dir
 # ---------------------------------------------------------------------------
 
 STORAGE_DIR = Path(
-    os.environ.get("NOTEBOOK_JULIAN_DATA_DIR", user_data_dir("notebook-julian"))
+    os.environ.get("NOTEBOOKLM_MCP_DATA_DIR", user_data_dir("notebooklm-mcp-2026"))
 )
 AUTH_FILE = STORAGE_DIR / "auth.json"
 CHROME_PROFILE_DIR = STORAGE_DIR / "chrome-profile"

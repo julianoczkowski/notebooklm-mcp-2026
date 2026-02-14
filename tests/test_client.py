@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from notebook_julian.client import (
+from notebooklm_mcp_2026.client import (
     NotebookLMClient,
     _extract_all_text,
     _extract_source_ids,

@@ -1,26 +1,26 @@
-# notebook-julian
+# notebooklm-mcp-2026
 
 Secure MCP server for querying Google NotebookLM notebooks. Designed for use with Claude Code, Cursor, VS Code Copilot, and any MCP-compatible AI assistant.
 
 ## What it does
 
-notebook-julian gives AI assistants direct access to your Google NotebookLM notebooks. It runs as a local subprocess (stdio transport) — no HTTP server needed. Your AI assistant can list your notebooks, read source content, and ask the NotebookLM AI questions about your sources.
+notebooklm-mcp-2026 gives AI assistants direct access to your Google NotebookLM notebooks. It runs as a local subprocess (stdio transport) — no HTTP server needed. Your AI assistant can list your notebooks, read source content, and ask the NotebookLM AI questions about your sources.
 
 ## Quick Start
 
 ```bash
 # 1. Install
-pip install notebook-julian
+pip install notebooklm-mcp-2026
 # or with uv:
-uv tool install notebook-julian
+uv tool install notebooklm-mcp-2026
 
 # 2. Authenticate (one-time — opens Chrome)
-notebook-julian login
+notebooklm-mcp-2026 login
 
 # 3. Add to your MCP client (see configuration below)
 
 # 4. Verify it works
-notebook-julian serve  # Should start without errors (Ctrl+C to stop)
+notebooklm-mcp-2026 serve  # Should start without errors (Ctrl+C to stop)
 ```
 
 ## Installation
@@ -29,25 +29,25 @@ notebook-julian serve  # Should start without errors (Ctrl+C to stop)
 
 ```bash
 # Via pip
-pip install notebook-julian
+pip install notebooklm-mcp-2026
 
 # Via uv (recommended)
-uv tool install notebook-julian
+uv tool install notebooklm-mcp-2026
 
 # From source
 git clone <this-repo>
-cd notebook-julian
+cd notebooklm-mcp-2026
 pip install -e .
 ```
 
 ## Authentication
 
-notebook-julian uses Google session cookies extracted via Chrome DevTools Protocol. No passwords are stored — only session cookies.
+notebooklm-mcp-2026 uses Google session cookies extracted via Chrome DevTools Protocol. No passwords are stored — only session cookies.
 
 ### First-time setup
 
 ```bash
-notebook-julian login
+notebooklm-mcp-2026 login
 ```
 
 This will:
@@ -56,17 +56,17 @@ This will:
 3. Extract session cookies via Chrome DevTools Protocol
 4. Save them locally with restricted file permissions (`0o600`)
 
-Cookies typically last 2–4 weeks. When they expire, run `notebook-julian login` again.
+Cookies typically last 2–4 weeks. When they expire, run `notebooklm-mcp-2026 login` again.
 
 ### Where credentials are stored
 
 | Platform | Location |
 |----------|----------|
-| Linux    | `~/.local/share/notebook-julian/auth.json` |
-| macOS    | `~/Library/Application Support/notebook-julian/auth.json` |
-| Windows  | `%LOCALAPPDATA%\notebook-julian\auth.json` |
+| Linux    | `~/.local/share/notebooklm-mcp-2026/auth.json` |
+| macOS    | `~/Library/Application Support/notebooklm-mcp-2026/auth.json` |
+| Windows  | `%LOCALAPPDATA%\notebooklm-mcp-2026\auth.json` |
 
-Override with: `NOTEBOOK_JULIAN_DATA_DIR=/custom/path`
+Override with: `NOTEBOOKLM_MCP_DATA_DIR=/custom/path`
 
 ## MCP Client Configuration
 
@@ -77,8 +77,8 @@ Add to `~/.claude/settings.json`:
 ```json
 {
   "mcpServers": {
-    "notebook-julian": {
-      "command": "notebook-julian",
+    "notebooklm-mcp-2026": {
+      "command": "notebooklm-mcp-2026",
       "args": ["serve"]
     }
   }
@@ -92,8 +92,8 @@ Add to `~/.cursor/mcp.json`:
 ```json
 {
   "mcpServers": {
-    "notebook-julian": {
-      "command": "notebook-julian",
+    "notebooklm-mcp-2026": {
+      "command": "notebooklm-mcp-2026",
       "args": ["serve"]
     }
   }
@@ -108,8 +108,8 @@ Add to VS Code `settings.json`:
 {
   "mcp": {
     "servers": {
-      "notebook-julian": {
-        "command": "notebook-julian",
+      "notebooklm-mcp-2026": {
+        "command": "notebooklm-mcp-2026",
         "args": ["serve"]
       }
     }
@@ -124,8 +124,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
 ```json
 {
   "mcpServers": {
-    "notebook-julian": {
-      "command": "notebook-julian",
+    "notebooklm-mcp-2026": {
+      "command": "notebooklm-mcp-2026",
       "args": ["serve"]
     }
   }
@@ -171,10 +171,10 @@ result = query_notebook(notebook_id="abc", query="Tell me more about that", conv
 ## Troubleshooting
 
 ### "Not authenticated" error
-Run `notebook-julian login` in your terminal.
+Run `notebooklm-mcp-2026 login` in your terminal.
 
 ### "Cookies expired" error
-Session cookies have a limited lifespan (2–4 weeks). Run `notebook-julian login` again.
+Session cookies have a limited lifespan (2–4 weeks). Run `notebooklm-mcp-2026 login` again.
 
 ### "Chrome not found" error
 Install Google Chrome. On Linux, ensure `google-chrome` or `chromium` is in your PATH.
@@ -185,7 +185,7 @@ Make sure you're logged into the correct Google account that has NotebookLM note
 ### "Build label" errors
 Google occasionally rotates their build label. Set the updated label:
 ```bash
-NOTEBOOKLM_BL="boq_labs-tailwind-frontend_YYYYMMDD.XX_p0" notebook-julian serve
+NOTEBOOKLM_BL="boq_labs-tailwind-frontend_YYYYMMDD.XX_p0" notebooklm-mcp-2026 serve
 ```
 
 ### Rate limit errors
@@ -195,7 +195,7 @@ NotebookLM free tier allows ~50 queries per day. Wait until the next day or upgr
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `NOTEBOOK_JULIAN_DATA_DIR` | Platform default | Override data storage location |
+| `NOTEBOOKLM_MCP_DATA_DIR` | Platform default | Override data storage location |
 | `NOTEBOOKLM_BL` | `boq_labs-tailwind-frontend_20260108.06_p0` | Google build label |
 | `NOTEBOOKLM_QUERY_TIMEOUT` | `120.0` | Query timeout in seconds |
 

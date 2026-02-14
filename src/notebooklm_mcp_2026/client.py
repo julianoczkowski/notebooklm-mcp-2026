@@ -41,7 +41,7 @@ from .protocol import (
     parse_response,
 )
 
-logger = logging.getLogger("notebook_julian.client")
+logger = logging.getLogger("notebooklm_mcp_2026.client")
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +50,7 @@ logger = logging.getLogger("notebook_julian.client")
 
 
 class NotebookJulianError(Exception):
-    """Base exception for all notebook-julian errors."""
+    """Base exception for all notebooklm-mcp-2026 errors."""
 
 
 class AuthenticationError(NotebookJulianError):
@@ -58,7 +58,7 @@ class AuthenticationError(NotebookJulianError):
 
     def __init__(self, message: str, hint: str = ""):
         super().__init__(message)
-        self.hint = hint or "Run 'notebook-julian login' to re-authenticate."
+        self.hint = hint or "Run 'notebooklm-mcp-2026 login' to re-authenticate."
 
 
 class APIError(NotebookJulianError):
@@ -162,7 +162,7 @@ class NotebookLMClient:
             if "accounts.google.com" in str(resp.url):
                 raise AuthenticationError(
                     "Cookies expired — redirected to Google login.",
-                    hint="Run 'notebook-julian login' to re-authenticate.",
+                    hint="Run 'notebooklm-mcp-2026 login' to re-authenticate.",
                 )
 
             if resp.status_code != 200:
@@ -267,7 +267,7 @@ class NotebookLMClient:
                 return self._retry_after_auth_refresh(rpc_id, params, path, timeout)
             raise AuthenticationError(
                 "Authentication expired after retry.",
-                hint="Run 'notebook-julian login' to re-authenticate.",
+                hint="Run 'notebooklm-mcp-2026 login' to re-authenticate.",
             )
 
     def _retry_after_auth_refresh(

@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from notebook_julian.auth import (
+from notebooklm_mcp_2026.auth import (
     AuthTokens,
     extract_csrf_from_html,
     extract_session_id_from_html,
@@ -49,8 +49,8 @@ class TestSaveLoadTokens:
         auth_file = tmp_path / "auth.json"
         tokens = AuthTokens(cookies=sample_cookies, csrf_token="csrf123")
 
-        with patch("notebook_julian.auth.AUTH_FILE", auth_file), \
-             patch("notebook_julian.auth.STORAGE_DIR", tmp_path):
+        with patch("notebooklm_mcp_2026.auth.AUTH_FILE", auth_file), \
+             patch("notebooklm_mcp_2026.auth.STORAGE_DIR", tmp_path):
             save_tokens(tokens)
             loaded = load_tokens()
 
@@ -62,8 +62,8 @@ class TestSaveLoadTokens:
         auth_file = tmp_path / "auth.json"
         tokens = AuthTokens(cookies=sample_cookies)
 
-        with patch("notebook_julian.auth.AUTH_FILE", auth_file), \
-             patch("notebook_julian.auth.STORAGE_DIR", tmp_path):
+        with patch("notebooklm_mcp_2026.auth.AUTH_FILE", auth_file), \
+             patch("notebooklm_mcp_2026.auth.STORAGE_DIR", tmp_path):
             save_tokens(tokens)
 
         if os.name != "nt":  # Skip on Windows
@@ -71,19 +71,19 @@ class TestSaveLoadTokens:
             assert mode == 0o600
 
     def test_load_missing_file(self, tmp_path):
-        with patch("notebook_julian.auth.AUTH_FILE", tmp_path / "nonexistent.json"):
+        with patch("notebooklm_mcp_2026.auth.AUTH_FILE", tmp_path / "nonexistent.json"):
             assert load_tokens() is None
 
     def test_load_corrupt_file(self, tmp_path):
         auth_file = tmp_path / "auth.json"
         auth_file.write_text("not valid json{{{")
-        with patch("notebook_julian.auth.AUTH_FILE", auth_file):
+        with patch("notebooklm_mcp_2026.auth.AUTH_FILE", auth_file):
             assert load_tokens() is None
 
     def test_load_empty_cookies(self, tmp_path):
         auth_file = tmp_path / "auth.json"
         auth_file.write_text(json.dumps({"cookies": {}}))
-        with patch("notebook_julian.auth.AUTH_FILE", auth_file):
+        with patch("notebooklm_mcp_2026.auth.AUTH_FILE", auth_file):
             assert load_tokens() is None
 
 
