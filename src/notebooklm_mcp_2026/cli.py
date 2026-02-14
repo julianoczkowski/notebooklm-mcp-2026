@@ -3,6 +3,7 @@
 Subcommands:
     serve   - Start MCP server over stdio (default)
     login   - Authenticate via Chrome
+    logout  - Remove stored credentials
     setup   - Interactive setup wizard
     status  - Check auth and configuration status
     doctor  - Diagnose common issues
@@ -621,6 +622,34 @@ def handle_doctor() -> None:
         console.print(f"[yellow]{fail_count} issue(s) found. See above.[/yellow]")
 
 
+def handle_logout() -> None:
+    """Remove stored credentials."""
+    from .config import AUTH_FILE, CHROME_PROFILE_DIR
+
+    removed = []
+
+    if AUTH_FILE.exists():
+        AUTH_FILE.unlink()
+        removed.append(f"Credentials: {AUTH_FILE}")
+
+    if CHROME_PROFILE_DIR.exists():
+        shutil.rmtree(CHROME_PROFILE_DIR, ignore_errors=True)
+        removed.append(f"Chrome profile: {CHROME_PROFILE_DIR}")
+
+    if removed:
+        console.print(Panel(
+            "[green bold]Logged out.[/green bold]\n\n"
+            + "\n".join(f"  Removed: [dim]{r}[/dim]" for r in removed)
+            + "\n\nRun [bold]notebooklm-mcp-2026 login[/bold] to authenticate again.",
+            title="[green]Logout[/green]",
+            border_style=SUCCESS_COLOR,
+            box=box.ROUNDED,
+            padding=(1, 2),
+        ))
+    else:
+        console.print("[dim]No credentials found — already logged out.[/dim]")
+
+
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
@@ -651,6 +680,9 @@ def main() -> None:
         help="Path to Chrome/Chromium executable (auto-detected if omitted)",
     )
 
+    # logout
+    subparsers.add_parser("logout", help="Remove stored credentials and Chrome profile")
+
     # setup
     subparsers.add_parser("setup", help="Interactive setup wizard")
 
@@ -667,6 +699,8 @@ def main() -> None:
 
     if args.command == "login":
         handle_login(args.timeout, chrome_path=args.chrome_path)
+    elif args.command == "logout":
+        handle_logout()
     elif args.command == "setup":
         handle_setup()
     elif args.command == "status":

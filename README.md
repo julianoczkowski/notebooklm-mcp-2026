@@ -120,6 +120,7 @@ Override with: `NOTEBOOKLM_MCP_DATA_DIR=/custom/path`
 |---------|-------------|
 | `notebooklm-mcp-2026 setup` | Interactive setup wizard — authenticates and configures your MCP client |
 | `notebooklm-mcp-2026 login` | Authenticate via Chrome (opens browser window) |
+| `notebooklm-mcp-2026 logout` | Remove stored credentials and start fresh |
 | `notebooklm-mcp-2026 serve` | Start the MCP server over stdio (used by MCP clients) |
 | `notebooklm-mcp-2026 status` | Show authentication and MCP client configuration status |
 | `notebooklm-mcp-2026 doctor` | Diagnose common issues (Chrome, auth, permissions) |
