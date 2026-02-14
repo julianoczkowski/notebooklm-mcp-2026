@@ -1,13 +1,14 @@
 """Branded CLI with interactive setup wizard, status, and diagnostics.
 
 Subcommands:
-    serve   - Start MCP server over stdio (default)
+    setup   - Interactive setup wizard
     login   - Authenticate via Chrome
     logout  - Remove stored credentials
-    setup   - Interactive setup wizard
     status  - Check auth and configuration status
     doctor  - Diagnose common issues
+    serve   - Start MCP server over stdio
     version - Print version
+    help    - Show help message (default when no command given)
 """
 
 from __future__ import annotations
@@ -650,6 +651,36 @@ def handle_logout() -> None:
         console.print("[dim]No credentials found — already logged out.[/dim]")
 
 
+def handle_help() -> None:
+    """Show branded help with all available commands."""
+    show_banner()
+    console.print()
+
+    commands = [
+        ("setup", "Interactive setup wizard — authenticate and configure MCP clients"),
+        ("login", "Authenticate via Chrome (opens browser window)"),
+        ("logout", "Remove stored credentials and Chrome profile"),
+        ("status", "Show authentication and MCP client configuration status"),
+        ("doctor", "Diagnose common issues (Chrome, auth, permissions)"),
+        ("serve", "Start the MCP server over stdio (used by MCP clients)"),
+        ("version", "Print version"),
+        ("help", "Show this help message"),
+    ]
+
+    table = Table(show_header=True, header_style="bold", box=box.SIMPLE, pad_edge=False)
+    table.add_column("Command", style="bold cyan", no_wrap=True)
+    table.add_column("Description")
+
+    for cmd, desc in commands:
+        table.add_row(f"notebooklm-mcp-2026 {cmd}", desc)
+
+    console.print(table)
+    console.print()
+    console.print("[bold]Getting started?[/bold] Run [bold cyan]notebooklm-mcp-2026 setup[/bold cyan]")
+    console.print()
+    console.print(f"[dim]More info: https://github.com/julianoczkowski/notebooklm-mcp-2026[/dim]")
+
+
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
@@ -660,10 +691,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         prog="notebooklm-mcp-2026",
         description="Secure MCP server for querying Google NotebookLM notebooks.",
+        add_help=False,
     )
     subparsers = parser.add_subparsers(dest="command")
 
-    # serve (default)
+    # serve
     serve_parser = subparsers.add_parser("serve", help="Run the MCP server (stdio)")
     serve_parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
@@ -695,6 +727,9 @@ def main() -> None:
     # version
     subparsers.add_parser("version", help="Print version and exit")
 
+    # help
+    subparsers.add_parser("help", help="Show help message")
+
     args = parser.parse_args()
 
     if args.command == "login":
@@ -709,11 +744,13 @@ def main() -> None:
         handle_doctor()
     elif args.command == "version":
         console.print(f"notebooklm-mcp-2026 {__version__}")
-    else:
-        # Default: serve
+    elif args.command == "serve":
         debug = getattr(args, "debug", False)
         if debug:
             logging.basicConfig(level=logging.DEBUG, stream=sys.stderr)
         from .server import mcp
 
         mcp.run(transport="stdio")
+    else:
+        # No command or "help" — show branded help
+        handle_help()
