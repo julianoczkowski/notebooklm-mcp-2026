@@ -9,8 +9,10 @@ notebooklm-mcp-2026 gives AI assistants direct access to your Google NotebookLM 
 ## Quick Start
 
 ```bash
-# 1. Install
-pip install notebooklm-mcp-2026
+# 1. Install (pick one)
+pipx install notebooklm-mcp-2026        # recommended
+uv tool install notebooklm-mcp-2026     # alternative
+pip install notebooklm-mcp-2026         # if inside a venv
 
 # 2. Run the setup wizard (authenticates + configures your MCP client)
 notebooklm-mcp-2026 setup
@@ -21,7 +23,7 @@ notebooklm-mcp-2026 setup
 Or step by step:
 
 ```bash
-pip install notebooklm-mcp-2026
+pipx install notebooklm-mcp-2026
 notebooklm-mcp-2026 login                # Opens Chrome for Google login
 notebooklm-mcp-2026 setup                # Auto-configures your MCP client
 notebooklm-mcp-2026 status               # Verify everything is connected
@@ -32,14 +34,17 @@ notebooklm-mcp-2026 status               # Verify everything is connected
 **Requirements:** Python 3.11+, Google Chrome
 
 ```bash
-# Via pip
-pip install notebooklm-mcp-2026
+# Via pipx (recommended — isolated install, command on PATH)
+pipx install notebooklm-mcp-2026
 
-# Via uv (recommended)
+# Via uv
 uv tool install notebooklm-mcp-2026
 
+# Via pip (inside a virtual environment)
+pip install notebooklm-mcp-2026
+
 # From source
-git clone <this-repo>
+git clone https://github.com/julianoczkowski/notebooklm-mcp-2026.git
 cd notebooklm-mcp-2026
 pip install -e .
 ```
