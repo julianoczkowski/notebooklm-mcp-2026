@@ -205,6 +205,12 @@ Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 }
 ```
 
+> **Note:** Claude Desktop (on both macOS and Windows) may not inherit your terminal's PATH. If the server doesn't appear, use the full path to the executable:
+> - macOS: `"command": "/Users/YOUR_USER/.local/bin/notebooklm-mcp-2026"`
+> - Windows: `"command": "C:\\Users\\YOUR_USER\\.local\\bin\\notebooklm-mcp-2026.exe"`
+>
+> Run `which notebooklm-mcp-2026` (macOS) or `where notebooklm-mcp-2026` (Windows) in a terminal to find the exact path.
+
 </details>
 
 ## Available Tools (9)
