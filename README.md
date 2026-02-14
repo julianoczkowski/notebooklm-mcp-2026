@@ -1,3 +1,12 @@
+[![MCP Server](https://img.shields.io/badge/MCP-server-7c3aed)](https://modelcontextprotocol.io)
+[![Google NotebookLM](https://img.shields.io/badge/Google-NotebookLM-4285F4)](https://notebooklm.google.com)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
+[![FastMCP](https://img.shields.io/badge/built_with-FastMCP-ff6600)](https://github.com/jlowin/fastmcp)
+[![PyPI](https://img.shields.io/pypi/v/notebooklm-mcp-2026)](https://pypi.org/project/notebooklm-mcp-2026/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+<img src="notebooklm_mcp.png" alt="NotebookLM MCP" width="600">
+
 # notebooklm-mcp-2026
 
 Secure MCP server for querying Google NotebookLM notebooks. Designed for use with Claude Code, Cursor, VS Code Copilot, and any MCP-compatible AI assistant.
@@ -35,6 +44,7 @@ notebooklm-mcp-2026 setup
 ```
 
 This will:
+
 1. Open Chrome so you can log in to your Google account
 2. Detect which MCP clients you have installed (Claude Code, Cursor, VS Code, etc.)
 3. Automatically configure them
@@ -62,13 +72,13 @@ If you used `uv` to install (recommended), you don't need to install Python sepa
 
 If you prefer to install Python manually:
 
-| Platform | Command |
-|----------|---------|
-| macOS | `brew install python` |
-| Ubuntu / Debian | `sudo apt install python3` |
-| Arch / Manjaro | `sudo pacman -S python` |
-| Fedora | `sudo dnf install python3` |
-| Windows | Download from [python.org](https://python.org) — tick **"Add to PATH"** during install |
+| Platform        | Command                                                                                |
+| --------------- | -------------------------------------------------------------------------------------- |
+| macOS           | `brew install python`                                                                  |
+| Ubuntu / Debian | `sudo apt install python3`                                                             |
+| Arch / Manjaro  | `sudo pacman -S python`                                                                |
+| Fedora          | `sudo dnf install python3`                                                             |
+| Windows         | Download from [python.org](https://python.org) — tick **"Add to PATH"** during install |
 
 ## Alternative Install Methods
 
@@ -106,25 +116,25 @@ notebooklm-mcp-2026 login --chrome-path "/path/to/chrome"
 
 ### Where credentials are stored
 
-| Platform | Location |
-|----------|----------|
-| Linux    | `~/.local/share/notebooklm-mcp-2026/auth.json` |
+| Platform | Location                                                      |
+| -------- | ------------------------------------------------------------- |
+| Linux    | `~/.local/share/notebooklm-mcp-2026/auth.json`                |
 | macOS    | `~/Library/Application Support/notebooklm-mcp-2026/auth.json` |
-| Windows  | `%LOCALAPPDATA%\notebooklm-mcp-2026\auth.json` |
+| Windows  | `%LOCALAPPDATA%\notebooklm-mcp-2026\auth.json`                |
 
 Override with: `NOTEBOOKLM_MCP_DATA_DIR=/custom/path`
 
 ## CLI Commands
 
-| Command | Description |
-|---------|-------------|
-| `notebooklm-mcp-2026 setup` | Interactive setup wizard — authenticates and configures your MCP client |
-| `notebooklm-mcp-2026 login` | Authenticate via Chrome (opens browser window) |
-| `notebooklm-mcp-2026 logout` | Remove stored credentials and start fresh |
-| `notebooklm-mcp-2026 serve` | Start the MCP server over stdio (used by MCP clients) |
-| `notebooklm-mcp-2026 status` | Show authentication and MCP client configuration status |
-| `notebooklm-mcp-2026 doctor` | Diagnose common issues (Chrome, auth, permissions) |
-| `notebooklm-mcp-2026 version` | Print version |
+| Command                       | Description                                                             |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| `notebooklm-mcp-2026 setup`   | Interactive setup wizard — authenticates and configures your MCP client |
+| `notebooklm-mcp-2026 login`   | Authenticate via Chrome (opens browser window)                          |
+| `notebooklm-mcp-2026 logout`  | Remove stored credentials and start fresh                               |
+| `notebooklm-mcp-2026 serve`   | Start the MCP server over stdio (used by MCP clients)                   |
+| `notebooklm-mcp-2026 status`  | Show authentication and MCP client configuration status                 |
+| `notebooklm-mcp-2026 doctor`  | Diagnose common issues (Chrome, auth, permissions)                      |
+| `notebooklm-mcp-2026 version` | Print version                                                           |
 
 ## MCP Client Configuration
 
@@ -199,17 +209,17 @@ Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ## Available Tools (9)
 
-| Tool | Description | Key Parameters |
-|------|-------------|----------------|
-| `login` | Launch Chrome for Google OAuth login | `timeout` (default: 300s) |
-| `check_auth` | Verify stored credentials are valid | — |
-| `list_notebooks` | List all notebooks with metadata | `max_results` (default: 50) |
-| `get_notebook` | Get notebook details + source list | `notebook_id` |
-| `list_sources` | List sources in a notebook | `notebook_id` |
-| `get_source_content` | Get full text of a source | `source_id` |
-| `query_notebook` | Ask the AI a question | `notebook_id`, `query`, `source_ids?`, `conversation_id?` |
-| `add_source_url` | Add a URL/YouTube source | `notebook_id`, `url` |
-| `add_source_text` | Add pasted text source | `notebook_id`, `text`, `title?` |
+| Tool                 | Description                          | Key Parameters                                            |
+| -------------------- | ------------------------------------ | --------------------------------------------------------- |
+| `login`              | Launch Chrome for Google OAuth login | `timeout` (default: 300s)                                 |
+| `check_auth`         | Verify stored credentials are valid  | —                                                         |
+| `list_notebooks`     | List all notebooks with metadata     | `max_results` (default: 50)                               |
+| `get_notebook`       | Get notebook details + source list   | `notebook_id`                                             |
+| `list_sources`       | List sources in a notebook           | `notebook_id`                                             |
+| `get_source_content` | Get full text of a source            | `source_id`                                               |
+| `query_notebook`     | Ask the AI a question                | `notebook_id`, `query`, `source_ids?`, `conversation_id?` |
+| `add_source_url`     | Add a URL/YouTube source             | `notebook_id`, `url`                                      |
+| `add_source_text`    | Add pasted text source               | `notebook_id`, `text`, `title?`                           |
 
 ### Typical workflow
 
@@ -236,42 +246,52 @@ result = query_notebook(notebook_id="abc", query="Tell me more about that", conv
 ## Troubleshooting
 
 ### "Not authenticated" error
+
 Run `notebooklm-mcp-2026 login` in your terminal.
 
 ### "Cookies expired" error
+
 Session cookies have a limited lifespan (2–4 weeks). Run `notebooklm-mcp-2026 login` again.
 
 ### "Chrome not found" error
+
 Install Google Chrome or Chromium. On Linux, ensure `google-chrome` or `chromium` is in your PATH. You can also specify the path directly:
+
 ```bash
 notebooklm-mcp-2026 login --chrome-path "/path/to/chrome"
 ```
 
 ### Empty notebook list
+
 Make sure you're logged into the correct Google account that has NotebookLM notebooks.
 
 ### "Build label" errors
+
 Google occasionally rotates their build label. Set the updated label:
+
 ```bash
 NOTEBOOKLM_BL="boq_labs-tailwind-frontend_YYYYMMDD.XX_p0" notebooklm-mcp-2026 serve
 ```
 
 ### Rate limit errors
+
 NotebookLM free tier allows ~50 queries per day. Wait until the next day or upgrade.
 
 ### Something else?
+
 Run the diagnostic tool:
+
 ```bash
 notebooklm-mcp-2026 doctor
 ```
 
 ## Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NOTEBOOKLM_MCP_DATA_DIR` | Platform default | Override data storage location |
-| `NOTEBOOKLM_BL` | `boq_labs-tailwind-frontend_20260108.06_p0` | Google build label |
-| `NOTEBOOKLM_QUERY_TIMEOUT` | `120.0` | Query timeout in seconds |
+| Variable                   | Default                                     | Description                    |
+| -------------------------- | ------------------------------------------- | ------------------------------ |
+| `NOTEBOOKLM_MCP_DATA_DIR`  | Platform default                            | Override data storage location |
+| `NOTEBOOKLM_BL`            | `boq_labs-tailwind-frontend_20260108.06_p0` | Google build label             |
+| `NOTEBOOKLM_QUERY_TIMEOUT` | `120.0`                                     | Query timeout in seconds       |
 
 ## Security
 
