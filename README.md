@@ -8,71 +8,78 @@ notebooklm-mcp-2026 gives AI assistants direct access to your Google NotebookLM 
 
 ## Quick Start
 
-```bash
-# 1. Install (pick one)
-pipx install notebooklm-mcp-2026        # recommended
-uv tool install notebooklm-mcp-2026     # alternative
-pip install notebooklm-mcp-2026         # if inside a venv
+Three commands. Works on macOS, Linux, and Windows.
 
-# 2. Run the setup wizard (authenticates + configures your MCP client)
-notebooklm-mcp-2026 setup
+### Step 1: Install
 
-# That's it! Restart your MCP client and start using it.
-```
-
-Or step by step:
+**macOS / Linux:**
 
 ```bash
-pipx install notebooklm-mcp-2026
-notebooklm-mcp-2026 login                # Opens Chrome for Google login
-notebooklm-mcp-2026 setup                # Auto-configures your MCP client
-notebooklm-mcp-2026 status               # Verify everything is connected
-```
-
-## Prerequisites
-
-**Python 3.11+**, **Google Chrome**, and **pipx** (recommended).
-
-### Linux
-
-```bash
-# Arch
-sudo pacman -S python python-pipx google-chrome  # or chromium
-
-# Ubuntu / Debian
-sudo apt install python3 python3-pip pipx google-chrome-stable
-
-# Fedora
-sudo dnf install python3 pipx google-chrome-stable
-```
-
-### macOS
-
-```bash
-brew install python pipx
-# Chrome: download from https://google.com/chrome or `brew install --cask google-chrome`
-```
-
-### Windows
-
-1. Install Python 3.11+ from [python.org](https://python.org) (tick **"Add to PATH"** during install)
-2. Install Chrome from [google.com/chrome](https://google.com/chrome)
-3. Open PowerShell:
-```powershell
-pip install --user pipx
-pipx ensurepath
-```
-
-## Installation
-
-```bash
-# Via pipx (recommended — isolated install, command on PATH)
-pipx install notebooklm-mcp-2026
-
-# Via uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
 uv tool install notebooklm-mcp-2026
+```
 
-# Via pip (inside a virtual environment)
+**Windows (PowerShell):**
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+uv tool install notebooklm-mcp-2026
+```
+
+> **Already have pipx?** You can use `pipx install notebooklm-mcp-2026` instead.
+
+### Step 2: Set up
+
+```bash
+notebooklm-mcp-2026 setup
+```
+
+This will:
+1. Open Chrome so you can log in to your Google account
+2. Detect which MCP clients you have installed (Claude Code, Cursor, VS Code, etc.)
+3. Automatically configure them
+
+### Step 3: Use it
+
+Restart your MCP client and ask your AI assistant:
+
+> "List my NotebookLM notebooks"
+
+That's it!
+
+## Requirements
+
+- **Google Chrome** (or Chromium) — needed for one-time login
+- **Python 3.11+** — installed automatically if you use `uv`
+
+### Don't have Chrome?
+
+Download it from [google.com/chrome](https://www.google.com/chrome/). On Linux, `chromium` also works.
+
+### Don't have Python?
+
+If you used `uv` to install (recommended), you don't need to install Python separately — `uv` handles it for you.
+
+If you prefer to install Python manually:
+
+| Platform | Command |
+|----------|---------|
+| macOS | `brew install python` |
+| Ubuntu / Debian | `sudo apt install python3` |
+| Arch / Manjaro | `sudo pacman -S python` |
+| Fedora | `sudo dnf install python3` |
+| Windows | Download from [python.org](https://python.org) — tick **"Add to PATH"** during install |
+
+## Alternative Install Methods
+
+The Quick Start uses `uv` because it's the simplest (single binary, no Python version conflicts). Other options:
+
+```bash
+# pipx (if you already have it)
+pipx install notebooklm-mcp-2026
+
+# pip (inside a virtual environment)
+python -m venv .venv && source .venv/bin/activate
 pip install notebooklm-mcp-2026
 
 # From source
@@ -85,19 +92,17 @@ pip install -e .
 
 notebooklm-mcp-2026 uses Google session cookies extracted via Chrome DevTools Protocol. No passwords are stored — only session cookies.
 
-### First-time setup
-
 ```bash
 notebooklm-mcp-2026 login
 ```
 
-This will:
-1. Launch Chrome pointing at notebooklm.google.com
-2. Wait for you to log in to your Google account
-3. Extract session cookies via Chrome DevTools Protocol
-4. Save them locally with restricted file permissions (`0o600`)
+This opens Chrome, you log in to Google, and the tool saves the session cookies locally. Cookies last 2–4 weeks. When they expire, run `login` again.
 
-Cookies typically last 2–4 weeks. When they expire, run `notebooklm-mcp-2026 login` again.
+If Chrome can't be found automatically, the tool will show you the exact command to launch Chrome manually, or you can specify the path:
+
+```bash
+notebooklm-mcp-2026 login --chrome-path "/path/to/chrome"
+```
 
 ### Where credentials are stored
 
@@ -122,26 +127,10 @@ Override with: `NOTEBOOKLM_MCP_DATA_DIR=/custom/path`
 
 ## MCP Client Configuration
 
-The `setup` command auto-configures your MCP client. For manual configuration, see below.
+The `setup` command auto-configures your MCP client. You should not need to edit these files manually, but if you do:
 
-### Claude Code
-
-Add to `~/.claude.json`:
-
-```json
-{
-  "mcpServers": {
-    "notebooklm-mcp-2026": {
-      "command": "notebooklm-mcp-2026",
-      "args": ["serve"]
-    }
-  }
-}
-```
-
-### Cursor
-
-Add to `~/.cursor/mcp.json`:
+<details>
+<summary>Claude Code — <code>~/.claude.json</code></summary>
 
 ```json
 {
@@ -154,26 +143,10 @@ Add to `~/.cursor/mcp.json`:
 }
 ```
 
-### VS Code (Copilot)
+</details>
 
-Add to VS Code `settings.json`:
-
-```json
-{
-  "mcp": {
-    "servers": {
-      "notebooklm-mcp-2026": {
-        "command": "notebooklm-mcp-2026",
-        "args": ["serve"]
-      }
-    }
-  }
-}
-```
-
-### Claude Desktop
-
-Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) or `%APPDATA%\Claude\claude_desktop_config.json` (Windows):
+<details>
+<summary>Cursor — <code>~/.cursor/mcp.json</code></summary>
 
 ```json
 {
@@ -185,6 +158,43 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS)
   }
 }
 ```
+
+</details>
+
+<details>
+<summary>VS Code (Copilot) — <code>mcp.json</code></summary>
+
+```json
+{
+  "servers": {
+    "notebooklm-mcp-2026": {
+      "command": "notebooklm-mcp-2026",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
+</details>
+
+<details>
+<summary>Claude Desktop</summary>
+
+macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
+Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "notebooklm-mcp-2026": {
+      "command": "notebooklm-mcp-2026",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
+</details>
 
 ## Available Tools (9)
 
@@ -231,7 +241,10 @@ Run `notebooklm-mcp-2026 login` in your terminal.
 Session cookies have a limited lifespan (2–4 weeks). Run `notebooklm-mcp-2026 login` again.
 
 ### "Chrome not found" error
-Install Google Chrome. On Linux, ensure `google-chrome` or `chromium` is in your PATH.
+Install Google Chrome or Chromium. On Linux, ensure `google-chrome` or `chromium` is in your PATH. You can also specify the path directly:
+```bash
+notebooklm-mcp-2026 login --chrome-path "/path/to/chrome"
+```
 
 ### Empty notebook list
 Make sure you're logged into the correct Google account that has NotebookLM notebooks.
@@ -244,6 +257,12 @@ NOTEBOOKLM_BL="boq_labs-tailwind-frontend_YYYYMMDD.XX_p0" notebooklm-mcp-2026 se
 
 ### Rate limit errors
 NotebookLM free tier allows ~50 queries per day. Wait until the next day or upgrade.
+
+### Something else?
+Run the diagnostic tool:
+```bash
+notebooklm-mcp-2026 doctor
+```
 
 ## Environment Variables
 
