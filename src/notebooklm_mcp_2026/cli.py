@@ -678,7 +678,7 @@ def handle_help() -> None:
     console.print()
     console.print("[bold]Getting started?[/bold] Run [bold cyan]notebooklm-mcp-2026 setup[/bold cyan]")
     console.print()
-    console.print(f"[dim]More info: https://github.com/julianoczkowski/notebooklm-mcp-2026[/dim]")
+    console.print("[dim]More info: https://github.com/julianoczkowski/notebooklm-mcp-2026[/dim]")
 
 
 # ---------------------------------------------------------------------------
