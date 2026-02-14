@@ -29,9 +29,41 @@ notebooklm-mcp-2026 setup                # Auto-configures your MCP client
 notebooklm-mcp-2026 status               # Verify everything is connected
 ```
 
-## Installation
+## Prerequisites
 
-**Requirements:** Python 3.11+, Google Chrome
+**Python 3.11+**, **Google Chrome**, and **pipx** (recommended).
+
+### Linux
+
+```bash
+# Arch
+sudo pacman -S python python-pipx google-chrome  # or chromium
+
+# Ubuntu / Debian
+sudo apt install python3 python3-pip pipx google-chrome-stable
+
+# Fedora
+sudo dnf install python3 pipx google-chrome-stable
+```
+
+### macOS
+
+```bash
+brew install python pipx
+# Chrome: download from https://google.com/chrome or `brew install --cask google-chrome`
+```
+
+### Windows
+
+1. Install Python 3.11+ from [python.org](https://python.org) (tick **"Add to PATH"** during install)
+2. Install Chrome from [google.com/chrome](https://google.com/chrome)
+3. Open PowerShell:
+```powershell
+pip install --user pipx
+pipx ensurepath
+```
+
+## Installation
 
 ```bash
 # Via pipx (recommended — isolated install, command on PATH)
@@ -94,7 +126,7 @@ The `setup` command auto-configures your MCP client. For manual configuration, s
 
 ### Claude Code
 
-Add to `~/.claude/settings.json`:
+Add to `~/.claude.json`:
 
 ```json
 {
