@@ -39,6 +39,8 @@ uv tool install notebooklm-mcp-2026
 
 ### Step 2: Set up
 
+> **Important:** Close Google Chrome completely before running setup. The login process needs to launch Chrome with special flags, which won't work if Chrome is already running.
+
 ```bash
 notebooklm-mcp-2026 setup
 ```
@@ -101,6 +103,8 @@ pip install -e .
 ## Authentication
 
 notebooklm-mcp-2026 uses Google session cookies extracted via Chrome DevTools Protocol. No passwords are stored — only session cookies.
+
+> **Important:** Close Google Chrome completely before running login. The login process needs to launch Chrome with special debugging flags, which won't work if Chrome is already running.
 
 ```bash
 notebooklm-mcp-2026 login
@@ -191,25 +195,50 @@ The `setup` command auto-configures your MCP client. You should not need to edit
 <details>
 <summary>Claude Desktop</summary>
 
-macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
-Windows: `%APPDATA%\Claude\claude_desktop_config.json`
+Claude Desktop does not inherit your terminal's PATH, so you **must use the full path** to the executable.
+
+First, find your executable path:
+
+```bash
+# macOS / Linux
+which notebooklm-mcp-2026
+
+# Windows (PowerShell)
+where notebooklm-mcp-2026
+```
+
+Then edit your config file:
+
+- **macOS:** `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Windows:** `%APPDATA%\Claude\claude_desktop_config.json`
+
+**macOS example:**
 
 ```json
 {
   "mcpServers": {
     "notebooklm-mcp-2026": {
-      "command": "notebooklm-mcp-2026",
+      "command": "/Users/YOUR_USER/.local/bin/notebooklm-mcp-2026",
       "args": ["serve"]
     }
   }
 }
 ```
 
-> **Note:** Claude Desktop (on both macOS and Windows) may not inherit your terminal's PATH. If the server doesn't appear, use the full path to the executable:
-> - macOS: `"command": "/Users/YOUR_USER/.local/bin/notebooklm-mcp-2026"`
-> - Windows: `"command": "C:\\Users\\YOUR_USER\\.local\\bin\\notebooklm-mcp-2026.exe"`
->
-> Run `which notebooklm-mcp-2026` (macOS) or `where notebooklm-mcp-2026` (Windows) in a terminal to find the exact path.
+**Windows example:**
+
+```json
+{
+  "mcpServers": {
+    "notebooklm-mcp-2026": {
+      "command": "C:\\Users\\YOUR_USER\\.local\\bin\\notebooklm-mcp-2026.exe",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
+Replace `YOUR_USER` with your actual username, or paste the exact path from the `which`/`where` command above.
 
 </details>
 
