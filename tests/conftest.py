@@ -1,8 +1,18 @@
 """Shared test fixtures."""
 
 import json
+import os
 
 import pytest
+
+
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    """Skip chrome-dependent tests in CI environments."""
+    if os.environ.get("CI"):
+        skip_chrome = pytest.mark.skip(reason="Requires Chrome, skipped in CI")
+        for item in items:
+            if "chrome" in item.keywords:
+                item.add_marker(skip_chrome)
 
 XSSI_PREFIX = ")]}'"
 

@@ -11,16 +11,20 @@ notebooklm-mcp-2026 gives AI assistants direct access to your Google NotebookLM 
 ```bash
 # 1. Install
 pip install notebooklm-mcp-2026
-# or with uv:
-uv tool install notebooklm-mcp-2026
 
-# 2. Authenticate (one-time — opens Chrome)
-notebooklm-mcp-2026 login
+# 2. Run the setup wizard (authenticates + configures your MCP client)
+notebooklm-mcp-2026 setup
 
-# 3. Add to your MCP client (see configuration below)
+# That's it! Restart your MCP client and start using it.
+```
 
-# 4. Verify it works
-notebooklm-mcp-2026 serve  # Should start without errors (Ctrl+C to stop)
+Or step by step:
+
+```bash
+pip install notebooklm-mcp-2026
+notebooklm-mcp-2026 login                # Opens Chrome for Google login
+notebooklm-mcp-2026 setup                # Auto-configures your MCP client
+notebooklm-mcp-2026 status               # Verify everything is connected
 ```
 
 ## Installation
@@ -68,7 +72,20 @@ Cookies typically last 2–4 weeks. When they expire, run `notebooklm-mcp-2026 l
 
 Override with: `NOTEBOOKLM_MCP_DATA_DIR=/custom/path`
 
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `notebooklm-mcp-2026 setup` | Interactive setup wizard — authenticates and configures your MCP client |
+| `notebooklm-mcp-2026 login` | Authenticate via Chrome (opens browser window) |
+| `notebooklm-mcp-2026 serve` | Start the MCP server over stdio (used by MCP clients) |
+| `notebooklm-mcp-2026 status` | Show authentication and MCP client configuration status |
+| `notebooklm-mcp-2026 doctor` | Diagnose common issues (Chrome, auth, permissions) |
+| `notebooklm-mcp-2026 version` | Print version |
+
 ## MCP Client Configuration
+
+The `setup` command auto-configures your MCP client. For manual configuration, see below.
 
 ### Claude Code
 
@@ -224,6 +241,16 @@ pytest
 # Lint
 ruff check src/ tests/
 ```
+
+### Testing with MCP Inspector
+
+The [MCP Inspector](https://modelcontextprotocol.io/docs/tools/inspector) lets you interactively test the server's tools in a web UI:
+
+```bash
+npx @modelcontextprotocol/inspector notebooklm-mcp-2026 serve
+```
+
+This opens a browser where you can call each of the 9 tools with custom parameters and inspect responses. You must run `notebooklm-mcp-2026 login` first.
 
 ## License
 

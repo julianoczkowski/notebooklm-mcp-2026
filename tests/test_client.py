@@ -3,8 +3,6 @@
 import json
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from notebooklm_mcp_2026.client import (
     NotebookLMClient,
     _extract_all_text,

@@ -23,6 +23,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from collections.abc import Callable
+
 from .config import (
     AUTH_FILE,
     CHROME_PROFILE_DIR,
@@ -174,20 +176,25 @@ def _cleanup_chrome() -> None:
 atexit.register(_cleanup_chrome)
 
 
-def _launch_chrome(port: int) -> subprocess.Popen:
-    """Launch Chrome with remote debugging. Never uses ``shell=True``."""
-    global _chrome_process
+def _remove_stale_locks(profile_dir: Path) -> None:
+    """Remove stale Chrome lock files so a fresh instance can start.
 
-    chrome_path = get_chrome_path()
-    if not chrome_path:
-        raise RuntimeError(
-            "Google Chrome not found. Install Chrome or set the path manually."
-        )
+    Chrome uses ``SingletonLock`` and ``SingletonSocket`` to enforce one
+    instance per user-data-dir. If a previous run crashed or was killed,
+    these locks are left behind and cause the next launch to immediately
+    delegate to the (dead) "existing" instance and exit.
+    """
+    for name in ("SingletonLock", "SingletonSocket", "SingletonCookie"):
+        lock = profile_dir / name
+        try:
+            lock.unlink(missing_ok=True)
+        except OSError:
+            pass
 
-    CHROME_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
 
-    args = [
-        chrome_path,
+def _get_chrome_launch_args(port: int) -> list[str]:
+    """Return Chrome CLI arguments for CDP login (without the executable)."""
+    return [
         f"--remote-debugging-port={port}",
         "--no-first-run",
         "--no-default-browser-check",
@@ -197,13 +204,62 @@ def _launch_chrome(port: int) -> subprocess.Popen:
         NOTEBOOKLM_URL,
     ]
 
+
+def _wait_for_cdp_connection(port: int, timeout: int) -> None:
+    """Poll until a CDP-enabled browser is reachable on *port*."""
+    start = time.time()
+    while time.time() - start < timeout:
+        if _get_debugger_ws_url(port):
+            return
+        time.sleep(2)
+    raise RuntimeError(
+        f"No Chrome connection detected on port {port} after {timeout}s. "
+        f"Make sure Chrome is running with --remote-debugging-port={port}."
+    )
+
+
+def _launch_chrome(port: int, chrome_path: str | None = None) -> subprocess.Popen:
+    """Launch Chrome with remote debugging. Never uses ``shell=True``."""
+    global _chrome_process
+
+    resolved = chrome_path or get_chrome_path()
+    if not resolved:
+        raise RuntimeError(
+            "Google Chrome not found. Install Chrome or use --chrome-path."
+        )
+
+    CHROME_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+    _remove_stale_locks(CHROME_PROFILE_DIR)
+
+    args = [resolved] + _get_chrome_launch_args(port)
+
     process = subprocess.Popen(
         args,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
     _chrome_process = process
-    time.sleep(3)  # Wait for Chrome to initialise
+
+    # Wait for Chrome to start, then verify it's still alive.
+    # Chrome exits immediately when it delegates to an existing instance
+    # with the same user-data-dir (the "3-second close" problem).
+    time.sleep(3)
+
+    exit_code = process.poll()
+    if exit_code is not None:
+        stderr_bytes = process.stderr.read() if process.stderr else b""
+        stderr_text = stderr_bytes.decode(errors="replace").strip()
+        hint = ""
+        if stderr_text:
+            hint = f"\nChrome stderr: {stderr_text[:500]}"
+        raise RuntimeError(
+            f"Chrome exited immediately (code {exit_code}). "
+            "This usually means another Chrome instance is using the same profile. "
+            "Close all Chrome windows and try again, or run:\n"
+            f"  rm -rf {CHROME_PROFILE_DIR}/Singleton*"
+            f"{hint}"
+        )
+
     return process
 
 
@@ -317,6 +373,8 @@ def extract_session_id_from_html(html: str) -> str:
 def extract_cookies_via_cdp(
     port: int | None = None,
     login_timeout: int = 300,
+    chrome_path: str | None = None,
+    on_manual_launch_needed: Callable[[int, list[str]], None] | None = None,
 ) -> AuthTokens:
     """Launch Chrome, wait for the user to log in, and extract auth tokens.
 
@@ -329,9 +387,17 @@ def extract_cookies_via_cdp(
     5. Filters to essential cookies only.
     6. Cleans up the Chrome process in a ``finally`` block.
 
+    If Chrome cannot be found and *on_manual_launch_needed* is provided,
+    the callback is invoked with ``(port, launch_args)`` so the caller
+    can display instructions for the user to launch Chrome manually.
+    The function then waits for a CDP connection before continuing.
+
     Args:
         port: Explicit port to use (auto-detected if ``None``).
         login_timeout: Maximum seconds to wait for login.
+        chrome_path: Explicit path to Chrome/Chromium executable.
+        on_manual_launch_needed: Called when Chrome is not found, receives
+            ``(port, launch_args)`` so the caller can show manual instructions.
 
     Returns:
         Populated :class:`AuthTokens`.
@@ -343,9 +409,21 @@ def extract_cookies_via_cdp(
         port = _find_available_port()
 
     chrome_proc: subprocess.Popen | None = None
+    resolved = chrome_path or get_chrome_path()
 
     try:
-        chrome_proc = _launch_chrome(port)
+        if resolved:
+            chrome_proc = _launch_chrome(port, resolved)
+        elif on_manual_launch_needed:
+            # Chrome not found — let the caller show manual instructions
+            CHROME_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
+            _remove_stale_locks(CHROME_PROFILE_DIR)
+            on_manual_launch_needed(port, _get_chrome_launch_args(port))
+            _wait_for_cdp_connection(port, login_timeout)
+        else:
+            raise RuntimeError(
+                "Google Chrome not found. Install Chrome or use --chrome-path."
+            )
 
         # Find the NotebookLM page
         page = _find_notebooklm_page(port)
@@ -356,51 +434,48 @@ def extract_cookies_via_cdp(
         if not ws_url:
             raise RuntimeError("No WebSocket URL for Chrome page — try restarting Chrome.")
 
-        # Wait for login
-        current_url = _get_current_url(ws_url)
-        if "notebooklm.google.com" not in current_url:
-            _navigate_to_url(ws_url, NOTEBOOKLM_URL)
-            current_url = _get_current_url(ws_url)
-
-        if "accounts.google.com" in current_url or "notebooklm.google.com" not in current_url:
-            logger.info("Waiting for Google login…")
-            start = time.time()
-            while time.time() - start < login_timeout:
-                time.sleep(5)
-                try:
-                    current_url = _get_current_url(ws_url)
-                    if "notebooklm.google.com" in current_url:
-                        break
-                except Exception:
-                    pass
-            else:
-                raise RuntimeError(
-                    f"Login timed out after {login_timeout}s. "
-                    "Please log in to NotebookLM in the Chrome window."
-                )
-
-        # Give the page a moment to fully load after login redirect
-        time.sleep(2)
-
-        # Extract cookies
-        raw_cookies = _get_page_cookies(ws_url)
-        if not raw_cookies:
-            raise RuntimeError("No cookies extracted — make sure you are fully logged in.")
-
-        # Filter to essential Google cookies on .google.com domain
+        # Wait for login.
+        #
+        # The URL check alone is unreliable: notebooklm.google.com appears
+        # briefly before redirecting to accounts.google.com.  Instead, we
+        # poll for the *required cookies* to appear — that's the real
+        # proof that the user has finished logging in.
+        logger.info("Waiting for Google login…")
+        start = time.time()
         cookies: dict[str, str] = {}
-        for c in raw_cookies:
-            name = c.get("name", "")
-            domain = c.get("domain", "")
-            if name in ESSENTIAL_COOKIES and ".google.com" in domain:
-                cookies[name] = c.get("value", "")
 
-        if not validate_cookies(cookies):
-            missing = REQUIRED_COOKIES - cookies.keys()
+        while time.time() - start < login_timeout:
+            try:
+                # Check if the required auth cookies exist yet
+                raw = _get_page_cookies(ws_url)
+                candidate: dict[str, str] = {}
+                for c in raw:
+                    name = c.get("name", "")
+                    domain = c.get("domain", "")
+                    if name in ESSENTIAL_COOKIES and ".google.com" in domain:
+                        candidate[name] = c.get("value", "")
+                if REQUIRED_COOKIES.issubset(candidate.keys()):
+                    cookies = candidate
+                    break
+            except Exception:
+                pass
+            time.sleep(5)
+        else:
             raise RuntimeError(
-                f"Missing required cookies: {', '.join(sorted(missing))}. "
-                "Make sure you are fully logged in."
+                f"Login timed out after {login_timeout}s. "
+                "Please log in to NotebookLM in the Chrome window."
             )
+
+        # Navigate back to NotebookLM so we can extract CSRF + session ID
+        # from the page HTML (the user may still be on accounts.google.com
+        # or a consent screen after cookies are set).
+        try:
+            current_url = _get_current_url(ws_url)
+            if "notebooklm.google.com" not in current_url:
+                _navigate_to_url(ws_url, NOTEBOOKLM_URL)
+                time.sleep(3)
+        except Exception:
+            pass
 
         # Extract CSRF and session ID from page HTML
         html = _get_page_html(ws_url)
@@ -431,32 +506,43 @@ def extract_cookies_via_cdp(
                 _chrome_process = None
 
 
-def _find_notebooklm_page(port: int) -> dict | None:
-    """Find an existing NotebookLM page or create one."""
+def _find_notebooklm_page(port: int, max_attempts: int = 5) -> dict | None:
+    """Find an existing NotebookLM page or create one.
+
+    Retries up to *max_attempts* times with 2-second delays because
+    Chrome's CDP endpoint may not be ready immediately after launch.
+    """
     import httpx
     from urllib.parse import quote
 
-    pages = _get_pages(port)
-    for page in pages:
-        if "notebooklm.google.com" in page.get("url", ""):
-            return page
+    for attempt in range(max_attempts):
+        pages = _get_pages(port)
+        for page in pages:
+            if "notebooklm.google.com" in page.get("url", ""):
+                return page
 
-    # Create a new tab
-    try:
-        encoded = quote(NOTEBOOKLM_URL, safe="")
-        resp = httpx.put(f"http://localhost:{port}/json/new?{encoded}", timeout=15)
-        if resp.status_code == 200 and resp.text.strip():
-            return resp.json()
+        # If we got pages but none match, try creating a new tab
+        if pages:
+            try:
+                encoded = quote(NOTEBOOKLM_URL, safe="")
+                resp = httpx.put(f"http://localhost:{port}/json/new?{encoded}", timeout=15)
+                if resp.status_code == 200 and resp.text.strip():
+                    return resp.json()
 
-        # Fallback: blank tab + navigate
-        resp = httpx.put(f"http://localhost:{port}/json/new", timeout=10)
-        if resp.status_code == 200 and resp.text.strip():
-            page = resp.json()
-            ws_url = page.get("webSocketDebuggerUrl")
-            if ws_url:
-                _navigate_to_url(ws_url, NOTEBOOKLM_URL)
-            return page
-    except Exception:
-        pass
+                # Fallback: blank tab + navigate
+                resp = httpx.put(f"http://localhost:{port}/json/new", timeout=10)
+                if resp.status_code == 200 and resp.text.strip():
+                    page = resp.json()
+                    ws_url = page.get("webSocketDebuggerUrl")
+                    if ws_url:
+                        _navigate_to_url(ws_url, NOTEBOOKLM_URL)
+                    return page
+            except Exception:
+                pass
+
+        # CDP not ready yet — wait and retry
+        if attempt < max_attempts - 1:
+            logger.debug("CDP not ready yet (attempt %d/%d), retrying...", attempt + 1, max_attempts)
+            time.sleep(2)
 
     return None

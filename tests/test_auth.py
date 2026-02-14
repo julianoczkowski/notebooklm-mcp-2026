@@ -2,11 +2,7 @@
 
 import json
 import os
-import tempfile
-from pathlib import Path
 from unittest.mock import patch
-
-import pytest
 
 from notebooklm_mcp_2026.auth import (
     AuthTokens,

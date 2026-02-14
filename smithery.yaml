@@ -1,0 +1,36 @@
+name: notebooklm-mcp-2026
+description: Secure MCP server for querying Google NotebookLM notebooks
+version: "0.1.0"
+author: Julian
+license: MIT
+
+runtime: python
+install: pip install notebooklm-mcp-2026
+
+startCommand:
+  type: stdio
+  commandFunction:
+    - notebooklm-mcp-2026
+    - serve
+
+tools:
+  - login
+  - check_auth
+  - list_notebooks
+  - get_notebook
+  - list_sources
+  - get_source_content
+  - query_notebook
+  - add_source_url
+  - add_source_text
+
+prerequisites:
+  - Google Chrome (for authentication)
+  - Python 3.11+
+
+tags:
+  - notebooklm
+  - google
+  - research
+  - notebooks
+  - knowledge-base
