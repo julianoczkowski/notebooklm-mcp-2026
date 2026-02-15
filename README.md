@@ -16,6 +16,10 @@ Secure MCP server for querying Google NotebookLM notebooks. Designed for use wit
 
 notebooklm-mcp-2026 gives AI assistants direct access to your Google NotebookLM notebooks. It runs as a local subprocess (stdio transport) — no HTTP server needed. Your AI assistant can list your notebooks, read source content, and ask the NotebookLM AI questions about your sources.
 
+<p align="center">
+  <img src="flow_animation.gif" alt="NotebookLM MCP Flow" width="100%">
+</p>
+
 ## Quick Start
 
 Three commands. Works on macOS, Linux, and Windows.
