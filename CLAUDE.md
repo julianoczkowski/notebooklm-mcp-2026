@@ -24,7 +24,12 @@ pytest -k "test_build_rpc_body"     # run one test by name
 # Run
 notebooklm-mcp-2026 serve           # start MCP server (stdio)
 notebooklm-mcp-2026 login           # interactive Chrome login
+notebooklm-mcp-2026 setup           # interactive setup wizard
+notebooklm-mcp-2026 doctor          # diagnose common issues
+notebooklm-mcp-2026 status          # show auth + config status
 ```
+
+All CLI subcommands support `--debug` for verbose logging. The `setup` command also supports `--dry-run`.
 
 ## Architecture
 
@@ -52,10 +57,12 @@ MCP Clients (Claude Desktop, etc.)
 ## Testing
 
 - `conftest.py` provides fixtures: `sample_cookies`, `sample_batchexecute_response`, `sample_query_response`
+- `test_tools.py` — unit tests for all 9 MCP tool functions (mock `server.get_client` and `auth.load_tokens`)
 - `@pytest.mark.chrome` — tests requiring Chrome, auto-skipped in CI
 - `@pytest.mark.integration` — integration tests using FastMCP Client
 - `asyncio_mode = "auto"` — async tests just work without explicit markers
 - `protocol.py` tests need no mocking (pure functions)
+- Coverage: `pytest --cov=notebooklm_mcp_2026 --cov-report=term-missing`
 
 ## Code Conventions
 
@@ -64,12 +71,30 @@ MCP Clients (Claude Desktop, etc.)
 - Google-style docstrings (Args, Returns, Raises)
 - Custom exceptions in `client.py`: `NotebookJulianError` (base), `AuthenticationError`, `APIError`, `ValidationError`
 - Credentials stored at `platformdirs.user_data_dir("notebooklm-mcp-2026")/auth.json` with `0o600` permissions
+- Pre-commit hooks: ruff check + ruff format (`.pre-commit-config.yaml`)
 
 ## Environment Variables
 
 - `NOTEBOOKLM_MCP_DATA_DIR` — override storage directory
 - `NOTEBOOKLM_BL` — override Google build label when it rotates
 - `NOTEBOOKLM_QUERY_TIMEOUT` — override query timeout (default 120s)
+
+## CI
+
+- GitHub Actions: runs on ubuntu, macos, windows × Python 3.11, 3.12, 3.13
+- Ruff lint + pytest with coverage on every push/PR
+- PyPI publish triggered by `v*` tags via trusted publishing
+
+## Repo Structure
+
+- `.github/FUNDING.yml` — sponsor links (Buy Me a Coffee, Ko-fi)
+- `.github/CODEOWNERS` — `@julianoczkowski` as default reviewer
+- `.github/dependabot.yml` — weekly dependency updates (pip + github-actions)
+- `CONTRIBUTING.md` — contributor guide
+- `CODE_OF_CONDUCT.md` — Contributor Covenant v2.1
+- `CHANGELOG.md` — release history
+- `SECURITY.md` — security policy + threat model
+- `examples/` — usage examples (basic_workflow.py, follow_up_conversation.py)
 
 ## Release
 
