@@ -1,3 +1,4 @@
+[![CI](https://github.com/julianoczkowski/notebooklm-mcp-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/julianoczkowski/notebooklm-mcp-2026/actions/workflows/ci.yml)
 [![MCP Server](https://img.shields.io/badge/MCP-server-7c3aed)](https://modelcontextprotocol.io)
 [![Google NotebookLM](https://img.shields.io/badge/Google-NotebookLM-4285F4)](https://notebooklm.google.com)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
@@ -265,6 +266,45 @@ Replace `YOUR_USER` with your actual username, or paste the exact path from the 
 4. get_source_content      → read raw source text if needed
 ```
 
+### Example output
+
+When your AI assistant calls `list_notebooks`, it gets back structured data like this:
+
+```json
+{
+  "status": "success",
+  "count": 2,
+  "notebooks": [
+    {
+      "id": "abc123-def456",
+      "title": "Research Notes",
+      "source_count": 3,
+      "is_owned": true,
+      "modified_at": "2026-01-15T10:30:00+00:00"
+    },
+    {
+      "id": "ghi789-jkl012",
+      "title": "Project Planning",
+      "source_count": 5,
+      "is_owned": true,
+      "modified_at": "2026-01-14T08:00:00+00:00"
+    }
+  ]
+}
+```
+
+And `query_notebook` returns:
+
+```json
+{
+  "status": "success",
+  "answer": "Based on the sources, the main topics covered are...",
+  "conversation_id": "conv-uuid-123",
+  "turn_number": 1,
+  "is_follow_up": false
+}
+```
+
 ### Follow-up conversations
 
 `query_notebook` returns a `conversation_id`. Pass it back to ask follow-up questions in the same conversation context:
@@ -363,6 +403,13 @@ npx @modelcontextprotocol/inspector notebooklm-mcp-2026 serve
 ```
 
 This opens a browser where you can call each of the 9 tools with custom parameters and inspect responses. You must run `notebooklm-mcp-2026 login` first.
+
+## Getting Help
+
+- **Questions?** Start a [Discussion](https://github.com/julianoczkowski/notebooklm-mcp-2026/discussions)
+- **Found a bug?** Open an [Issue](https://github.com/julianoczkowski/notebooklm-mcp-2026/issues)
+- **Want to contribute?** See [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Security issue?** See [SECURITY.md](SECURITY.md) for responsible disclosure
 
 ## License
 

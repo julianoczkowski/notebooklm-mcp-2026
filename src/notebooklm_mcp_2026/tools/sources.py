@@ -34,7 +34,11 @@ def list_sources(notebook_id: str) -> dict[str, Any]:
     except NotebookJulianError as e:
         return {"status": "error", "error": str(e)}
     except Exception as e:
-        return {"status": "error", "error": f"Unexpected error: {e}"}
+        return {
+            "status": "error",
+            "error": f"Unexpected error: {e}",
+            "hint": "Run 'notebooklm-mcp-2026 doctor' to diagnose issues.",
+        }
 
 
 def get_source_content(source_id: str) -> dict[str, Any]:
@@ -65,7 +69,11 @@ def get_source_content(source_id: str) -> dict[str, Any]:
     except NotebookJulianError as e:
         return {"status": "error", "error": str(e)}
     except Exception as e:
-        return {"status": "error", "error": f"Unexpected error: {e}"}
+        return {
+            "status": "error",
+            "error": f"Unexpected error: {e}",
+            "hint": "Run 'notebooklm-mcp-2026 doctor' to diagnose issues.",
+        }
 
 
 def add_source_url(notebook_id: str, url: str) -> dict[str, Any]:
@@ -102,7 +110,11 @@ def add_source_url(notebook_id: str, url: str) -> dict[str, Any]:
     except NotebookJulianError as e:
         return {"status": "error", "error": str(e)}
     except Exception as e:
-        return {"status": "error", "error": f"Unexpected error: {e}"}
+        return {
+            "status": "error",
+            "error": f"Unexpected error: {e}",
+            "hint": "Run 'notebooklm-mcp-2026 doctor' to diagnose issues.",
+        }
 
 
 def add_source_text(
@@ -143,4 +155,8 @@ def add_source_text(
     except NotebookJulianError as e:
         return {"status": "error", "error": str(e)}
     except Exception as e:
-        return {"status": "error", "error": f"Unexpected error: {e}"}
+        return {
+            "status": "error",
+            "error": f"Unexpected error: {e}",
+            "hint": "Run 'notebooklm-mcp-2026 doctor' to diagnose issues.",
+        }
