@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "notebooklm-mcp-2026"
-version = "0.1.2"
+version = "0.2.0"
 description = "Secure MCP server for querying Google NotebookLM notebooks"
 readme = "README.md"
 license = "MIT"
