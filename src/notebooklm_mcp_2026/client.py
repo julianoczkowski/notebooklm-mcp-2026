@@ -254,7 +254,15 @@ class NotebookLMClient:
                         _auth_retried=_auth_retried,
                         _server_retry=_server_retry + 1,
                     )
-                raise APIError(f"Server error {status} after {config.MAX_RETRIES + 1} attempts")
+                if status == 429:
+                    raise APIError(
+                        f"Rate limited (HTTP 429) after {config.MAX_RETRIES + 1} attempts. "
+                        "NotebookLM free tier allows ~50 queries/day. Try again later."
+                    )
+                raise APIError(
+                    f"Server error {status} after {config.MAX_RETRIES + 1} attempts. "
+                    "Google's servers may be temporarily unavailable."
+                )
 
             # Auth errors (401, 403)
             if status in (401, 403) and not _auth_retried:

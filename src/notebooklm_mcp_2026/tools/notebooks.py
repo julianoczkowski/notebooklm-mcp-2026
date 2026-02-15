@@ -33,7 +33,11 @@ def list_notebooks(max_results: int = 50) -> dict[str, Any]:
     except NotebookJulianError as e:
         return {"status": "error", "error": str(e)}
     except Exception as e:
-        return {"status": "error", "error": f"Unexpected error: {e}"}
+        return {
+            "status": "error",
+            "error": f"Unexpected error: {e}",
+            "hint": "Run 'notebooklm-mcp-2026 doctor' to diagnose issues.",
+        }
 
 
 def get_notebook(notebook_id: str) -> dict[str, Any]:
@@ -71,4 +75,8 @@ def get_notebook(notebook_id: str) -> dict[str, Any]:
     except NotebookJulianError as e:
         return {"status": "error", "error": str(e)}
     except Exception as e:
-        return {"status": "error", "error": f"Unexpected error: {e}"}
+        return {
+            "status": "error",
+            "error": f"Unexpected error: {e}",
+            "hint": "Run 'notebooklm-mcp-2026 doctor' to diagnose issues.",
+        }

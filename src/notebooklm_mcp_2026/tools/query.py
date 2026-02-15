@@ -51,4 +51,8 @@ def query_notebook(
     except NotebookJulianError as e:
         return {"status": "error", "error": str(e)}
     except Exception as e:
-        return {"status": "error", "error": f"Unexpected error: {e}"}
+        return {
+            "status": "error",
+            "error": f"Unexpected error: {e}",
+            "hint": "Run 'notebooklm-mcp-2026 doctor' to diagnose issues.",
+        }

@@ -251,12 +251,15 @@ def merge_mcp_config(
 # ---------------------------------------------------------------------------
 
 
-def handle_setup() -> None:
+def handle_setup(*, dry_run: bool = False) -> None:
     """Interactive setup wizard."""
     import questionary
 
     show_banner()
     console.print()
+
+    if dry_run:
+        console.print("[bold yellow]DRY RUN[/bold yellow] — no changes will be made.\n")
 
     # Step 1: Check authentication ──────────────────────────────────
     console.print("[bold]Step 1:[/bold] Checking authentication...", style=BRAND_COLOR)
@@ -266,25 +269,26 @@ def handle_setup() -> None:
     tokens = load_tokens()
     if tokens is None:
         console.print("  [yellow]Not authenticated[/yellow]")
-        console.print()
-        do_login = questionary.confirm(
-            "Would you like to log in now?",
-            default=True,
-        ).ask()
-        if do_login is None:  # Ctrl+C
-            console.print("\n[dim]Setup cancelled.[/dim]")
-            sys.exit(0)
-        if do_login:
-            _run_login(timeout=300)
-            tokens = load_tokens()
-            if tokens is None:
-                console.print("[red]Login failed. Retry with: notebooklm-mcp-2026 login[/red]")
-                sys.exit(1)
-        else:
-            console.print(
-                "  [dim]Skipping — you can log in later with: "
-                "notebooklm-mcp-2026 login[/dim]"
-            )
+        if not dry_run:
+            console.print()
+            do_login = questionary.confirm(
+                "Would you like to log in now?",
+                default=True,
+            ).ask()
+            if do_login is None:  # Ctrl+C
+                console.print("\n[dim]Setup cancelled.[/dim]")
+                sys.exit(0)
+            if do_login:
+                _run_login(timeout=300)
+                tokens = load_tokens()
+                if tokens is None:
+                    console.print("[red]Login failed. Retry with: notebooklm-mcp-2026 login[/red]")
+                    sys.exit(1)
+            else:
+                console.print(
+                    "  [dim]Skipping — you can log in later with: "
+                    "notebooklm-mcp-2026 login[/dim]"
+                )
     else:
         age_hours = (time.time() - tokens.extracted_at) / 3600
         console.print(
@@ -312,34 +316,45 @@ def handle_setup() -> None:
     console.print()
 
     # Step 3: Select clients to configure ───────────────────────────
-    console.print("[bold]Step 3:[/bold] Select clients to configure", style=BRAND_COLOR)
-    choices = questionary.checkbox(
-        "Which clients should be configured?",
-        choices=[
-            questionary.Choice(title=c.name, value=c.slug, checked=True)
-            for c in detected
-        ],
-    ).ask()
+    if dry_run:
+        selected = detected
+        console.print("[bold]Step 3:[/bold] Would configure all detected clients", style=BRAND_COLOR)
+    else:
+        console.print("[bold]Step 3:[/bold] Select clients to configure", style=BRAND_COLOR)
+        choices = questionary.checkbox(
+            "Which clients should be configured?",
+            choices=[
+                questionary.Choice(title=c.name, value=c.slug, checked=True)
+                for c in detected
+            ],
+        ).ask()
 
-    if choices is None:  # Ctrl+C
-        console.print("\n[dim]Setup cancelled.[/dim]")
-        sys.exit(0)
+        if choices is None:  # Ctrl+C
+            console.print("\n[dim]Setup cancelled.[/dim]")
+            sys.exit(0)
 
-    if not choices:
-        console.print("[dim]No clients selected.[/dim]")
-        return
+        if not choices:
+            console.print("[dim]No clients selected.[/dim]")
+            return
+
+        selected = [c for c in detected if c.slug in choices]
 
     console.print()
 
     # Step 4: Configure selected clients ────────────────────────────
-    console.print("[bold]Step 4:[/bold] Configuring MCP clients...", style=BRAND_COLOR)
-    selected = [c for c in detected if c.slug in choices]
+    action = "Would configure" if dry_run else "Configuring"
+    console.print(f"[bold]Step 4:[/bold] {action} MCP clients...", style=BRAND_COLOR)
     results: list[tuple[str, bool]] = []
 
     for client_cfg in selected:
         config_path = client_cfg.config_path()
         if config_path is None:
             console.print(f"  {client_cfg.name}: [yellow]skipped (unsupported platform)[/yellow]")
+            continue
+
+        if dry_run:
+            console.print(f"  {client_cfg.name}: [cyan]would write to {config_path}[/cyan]")
+            results.append((client_cfg.name, True))
             continue
 
         with console.status(f"  Configuring {client_cfg.name}...", spinner="dots"):
@@ -711,18 +726,25 @@ def main() -> None:
         "--chrome-path",
         help="Path to Chrome/Chromium executable (auto-detected if omitted)",
     )
+    login_parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
     # logout
     subparsers.add_parser("logout", help="Remove stored credentials and Chrome profile")
 
     # setup
-    subparsers.add_parser("setup", help="Interactive setup wizard")
+    setup_parser = subparsers.add_parser("setup", help="Interactive setup wizard")
+    setup_parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+    setup_parser.add_argument(
+        "--dry-run", action="store_true", help="Show what would be configured without making changes"
+    )
 
     # status
-    subparsers.add_parser("status", help="Show auth and config status")
+    status_parser = subparsers.add_parser("status", help="Show auth and config status")
+    status_parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
     # doctor
-    subparsers.add_parser("doctor", help="Diagnose common issues")
+    doctor_parser = subparsers.add_parser("doctor", help="Diagnose common issues")
+    doctor_parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
     # version
     subparsers.add_parser("version", help="Print version and exit")
@@ -732,12 +754,17 @@ def main() -> None:
 
     args = parser.parse_args()
 
+    debug = getattr(args, "debug", False)
+    if debug:
+        logging.basicConfig(level=logging.DEBUG, stream=sys.stderr)
+
     if args.command == "login":
         handle_login(args.timeout, chrome_path=args.chrome_path)
     elif args.command == "logout":
         handle_logout()
     elif args.command == "setup":
-        handle_setup()
+        dry_run = getattr(args, "dry_run", False)
+        handle_setup(dry_run=dry_run)
     elif args.command == "status":
         handle_status()
     elif args.command == "doctor":
@@ -745,9 +772,6 @@ def main() -> None:
     elif args.command == "version":
         console.print(f"notebooklm-mcp-2026 {__version__}")
     elif args.command == "serve":
-        debug = getattr(args, "debug", False)
-        if debug:
-            logging.basicConfig(level=logging.DEBUG, stream=sys.stderr)
         from .server import mcp
 
         mcp.run(transport="stdio")
