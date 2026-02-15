@@ -24,9 +24,12 @@ pytest -k "test_build_rpc_body"     # run one test by name
 # Run
 notebooklm-mcp-2026 serve           # start MCP server (stdio)
 notebooklm-mcp-2026 login           # interactive Chrome login
+notebooklm-mcp-2026 logout          # remove stored credentials
 notebooklm-mcp-2026 setup           # interactive setup wizard
 notebooklm-mcp-2026 doctor          # diagnose common issues
 notebooklm-mcp-2026 status          # show auth + config status
+notebooklm-mcp-2026 version         # print version
+notebooklm-mcp-2026 help            # show help message
 ```
 
 All CLI subcommands support `--debug` for verbose logging. The `setup` command also supports `--dry-run`.
@@ -94,8 +97,11 @@ MCP Clients (Claude Desktop, etc.)
 - `CODE_OF_CONDUCT.md` — Contributor Covenant v2.1
 - `CHANGELOG.md` — release history
 - `SECURITY.md` — security policy + threat model
+- `.github/ISSUE_TEMPLATE/` — bug report and feature request templates
 - `examples/` — usage examples (basic_workflow.py, follow_up_conversation.py)
 
-## Release
+## Skills (Slash Commands)
 
-Use `/release` to run the automated release workflow (lint, test, version bump, git tag, GitHub release, PyPI publish via CI).
+- `/release` — lint, test, version bump, git tag, GitHub release, PyPI publish via CI
+- `/cleanup-branches` — delete merged local + remote branches, prune stale refs
+- `/sync-docs` — scan recent commits, update CLAUDE.md and CHANGELOG.md to match
