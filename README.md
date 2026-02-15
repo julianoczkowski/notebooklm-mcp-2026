@@ -5,7 +5,7 @@
 [![PyPI](https://img.shields.io/pypi/v/notebooklm-mcp-2026)](https://pypi.org/project/notebooklm-mcp-2026/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
-<img src="notebooklm_mcp.png" alt="NotebookLM MCP" width="600">
+<img src="notebooklm_mcp_hero.png" alt="NotebookLM MCP" width="600">
 
 # notebooklm-mcp-2026
 
