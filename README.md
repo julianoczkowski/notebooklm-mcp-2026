@@ -14,6 +14,8 @@
 
 Secure MCP server for querying Google NotebookLM notebooks. Designed for use with Claude Code, Cursor, VS Code Copilot, and any MCP-compatible AI assistant.
 
+**Watch on YouTube:** [https://youtu.be/xdI3uEA5rew?si=FkD0sdCZSFFWpjhy](https://youtu.be/xdI3uEA5rew?si=FkD0sdCZSFFWpjhy)
+
 <p align="left">
   <a href="https://youtu.be/xdI3uEA5rew?si=FkD0sdCZSFFWpjhy">
     <img src="https://img.youtube.com/vi/xdI3uEA5rew/maxresdefault.jpg" alt="Watch the video" width="100%">
