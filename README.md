@@ -14,6 +14,12 @@
 
 Secure MCP server for querying Google NotebookLM notebooks. Designed for use with Claude Code, Cursor, VS Code Copilot, and any MCP-compatible AI assistant.
 
+<p align="left">
+  <a href="https://youtu.be/xdI3uEA5rew?si=FkD0sdCZSFFWpjhy">
+    <img src="https://img.youtube.com/vi/xdI3uEA5rew/maxresdefault.jpg" alt="Watch the video" width="100%">
+  </a>
+</p>
+
 ## What it does
 
 notebooklm-mcp-2026 gives AI assistants direct access to your Google NotebookLM notebooks. It runs as a local subprocess (stdio transport) — no HTTP server needed. Your AI assistant can list your notebooks, read source content, and ask the NotebookLM AI questions about your sources.
