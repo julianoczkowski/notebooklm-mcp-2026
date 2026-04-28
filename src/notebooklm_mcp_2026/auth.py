@@ -243,22 +243,33 @@ def _launch_chrome(port: int, chrome_path: str | None = None) -> subprocess.Pope
     # Wait for Chrome to start, then verify it's still alive.
     # Chrome exits immediately when it delegates to an existing instance
     # with the same user-data-dir (the "3-second close" problem).
+    #
+    # On Windows, Chrome uses a multi-process architecture: the launcher
+    # process exits with code 0 immediately while the actual browser runs
+    # as a detached child process.  In that case the CDP port will still
+    # become available, so we treat a code-0 exit as a warning rather
+    # than an immediate error and fall through to the CDP check below.
     time.sleep(3)
 
     exit_code = process.poll()
     if exit_code is not None:
-        stderr_bytes = process.stderr.read() if process.stderr else b""
-        stderr_text = stderr_bytes.decode(errors="replace").strip()
-        hint = ""
-        if stderr_text:
-            hint = f"\nChrome stderr: {stderr_text[:500]}"
-        raise RuntimeError(
-            f"Chrome exited immediately (code {exit_code}). "
-            "This usually means another Chrome instance is using the same profile. "
-            "Close all Chrome windows and try again, or run:\n"
-            f"  rm -rf {CHROME_PROFILE_DIR}/Singleton*"
-            f"{hint}"
-        )
+        if exit_code == 0 and _get_debugger_ws_url(port):
+            # Windows launcher exited but the browser child is alive and
+            # CDP is already responding — continue normally.
+            logger.debug("Chrome launcher exited (code 0) but CDP is live — Windows multi-process mode.")
+        else:
+            stderr_bytes = process.stderr.read() if process.stderr else b""
+            stderr_text = stderr_bytes.decode(errors="replace").strip()
+            hint = ""
+            if stderr_text:
+                hint = f"\nChrome stderr: {stderr_text[:500]}"
+            raise RuntimeError(
+                f"Chrome exited immediately (code {exit_code}). "
+                "This usually means another Chrome instance is using the same profile. "
+                "Close all Chrome windows and try again, or run:\n"
+                f"  rm -rf {CHROME_PROFILE_DIR}/Singleton*"
+                f"{hint}"
+            )
 
     return process
 
