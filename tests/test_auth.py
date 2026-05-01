@@ -2,8 +2,11 @@
 
 import json
 import os
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
+import pytest
+
+from notebooklm_mcp_2026 import auth
 from notebooklm_mcp_2026.auth import (
     AuthTokens,
     extract_csrf_from_html,
@@ -118,3 +121,78 @@ class TestExtractSessionId:
 
     def test_no_session_id(self):
         assert extract_session_id_from_html("<html>nothing</html>") == ""
+
+
+class TestLaunchChrome:
+    """Cover the Windows multi-process launcher behavior in _launch_chrome."""
+
+    def _patches(self, popen_mock):
+        return [
+            patch("notebooklm_mcp_2026.auth.subprocess.Popen", return_value=popen_mock),
+            patch("notebooklm_mcp_2026.auth.time.sleep"),
+            patch("notebooklm_mcp_2026.auth._remove_stale_locks"),
+            patch("notebooklm_mcp_2026.auth.CHROME_PROFILE_DIR", MagicMock()),
+        ]
+
+    def _enter(self, patches):
+        for p in patches:
+            p.start()
+
+    def _exit(self, patches):
+        for p in patches:
+            p.stop()
+
+    def test_windows_multi_process_exit_with_live_cdp_succeeds(self):
+        process = MagicMock()
+        process.poll.return_value = 0  # launcher exited cleanly
+        patches = self._patches(process)
+        self._enter(patches)
+        try:
+            with patch(
+                "notebooklm_mcp_2026.auth._get_debugger_ws_url",
+                return_value="ws://localhost:9222/devtools/browser/abc",
+            ):
+                result = auth._launch_chrome(9222, chrome_path="/fake/chrome")
+            assert result is process
+        finally:
+            self._exit(patches)
+
+    def test_exit_with_no_cdp_raises(self):
+        process = MagicMock()
+        process.poll.return_value = 0
+        process.stderr.read.return_value = b""
+        patches = self._patches(process)
+        self._enter(patches)
+        try:
+            with patch("notebooklm_mcp_2026.auth._get_debugger_ws_url", return_value=None):
+                with pytest.raises(RuntimeError, match="Chrome exited immediately"):
+                    auth._launch_chrome(9222, chrome_path="/fake/chrome")
+        finally:
+            self._exit(patches)
+
+    def test_nonzero_exit_raises_even_if_cdp_responds(self):
+        process = MagicMock()
+        process.poll.return_value = 1  # real failure
+        process.stderr.read.return_value = b"profile in use"
+        patches = self._patches(process)
+        self._enter(patches)
+        try:
+            with patch(
+                "notebooklm_mcp_2026.auth._get_debugger_ws_url",
+                return_value="ws://localhost:9222/devtools/browser/abc",
+            ):
+                with pytest.raises(RuntimeError, match="Chrome exited immediately"):
+                    auth._launch_chrome(9222, chrome_path="/fake/chrome")
+        finally:
+            self._exit(patches)
+
+    def test_running_process_returned(self):
+        process = MagicMock()
+        process.poll.return_value = None  # still running
+        patches = self._patches(process)
+        self._enter(patches)
+        try:
+            result = auth._launch_chrome(9222, chrome_path="/fake/chrome")
+            assert result is process
+        finally:
+            self._exit(patches)
