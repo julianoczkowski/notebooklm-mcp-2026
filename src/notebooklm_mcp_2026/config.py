@@ -6,6 +6,7 @@ API URLs, RPC IDs, headers, or timeouts.
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from platformdirs import user_data_dir
 
@@ -23,7 +24,18 @@ CHROME_PROFILE_DIR = STORAGE_DIR / "chrome-profile"
 # API endpoints
 # ---------------------------------------------------------------------------
 
-BASE_URL = "https://notebooklm.google.com"
+# NotebookLM moved from notebooklm.google.com to notebook.google.com in
+# September 2026. The old host now 301-redirects (unauthenticated) or bounces
+# to accounts.google.com ServiceLogin (authenticated), so every RPC sent to
+# it fails with HTTP 401. Overridable in case Google moves it again.
+BASE_URL = os.environ.get("NOTEBOOKLM_BASE_URL", "https://notebook.google.com").rstrip("/")
+NOTEBOOKLM_HOST = urlsplit(BASE_URL).hostname or "notebook.google.com"
+
+# Previous hostnames. Used only to recognise an already-open NotebookLM tab;
+# never used for API calls, and their host-scoped OSID cookies are NOT valid
+# for the current host.
+LEGACY_HOSTS = frozenset({"notebooklm.google.com"})
+
 BATCHEXECUTE_URL = f"{BASE_URL}/_/LabsTailwindUi/data/batchexecute"
 QUERY_ENDPOINT = (
     "/_/LabsTailwindUi/data/"
@@ -31,11 +43,11 @@ QUERY_ENDPOINT = (
     "LabsTailwindOrchestrationService/GenerateFreeFormStreamed"
 )
 
-# Build label — overridable via env var when Google rotates it
-BUILD_LABEL = os.environ.get(
-    "NOTEBOOKLM_BL",
-    "boq_labs-tailwind-frontend_20260108.06_p0",
-)
+# Build label. The client reads the live value (``cfb2h``) from the
+# NotebookLM page on every token refresh; this constant is only the fallback
+# used before the first page fetch. ``NOTEBOOKLM_BL`` forces a fixed value.
+BUILD_LABEL_OVERRIDE = os.environ.get("NOTEBOOKLM_BL", "")
+BUILD_LABEL = BUILD_LABEL_OVERRIDE or "boq_labs-tailwind-frontend_20260923.16_p0"
 
 # ---------------------------------------------------------------------------
 # RPC IDs (only the subset needed for our 9 tools)
@@ -70,6 +82,12 @@ SOURCE_TYPES: dict[int, str] = {
 
 # Minimum cookies required for API calls to succeed
 REQUIRED_COOKIES = frozenset({"SID", "HSID", "SSID", "APISID", "SAPISID"})
+
+# Per-service session cookies. Google issues a separate OSID/__Secure-OSID
+# for every service host (mail., drive., notebook., notebooklm., ...). Only
+# the pair scoped to NOTEBOOKLM_HOST is accepted by NotebookLM; any other
+# host's value makes NotebookLM redirect to ServiceLogin?osid=1.
+HOST_SCOPED_COOKIES = frozenset({"OSID", "__Secure-OSID"})
 
 # Full set of cookies we keep from Chrome (superset of REQUIRED_COOKIES)
 ESSENTIAL_COOKIES = frozenset({

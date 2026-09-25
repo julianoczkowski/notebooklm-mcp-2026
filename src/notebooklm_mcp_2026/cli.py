@@ -416,14 +416,41 @@ def _show_success_panel(results: list[tuple[str, bool]]) -> None:
     ))
 
 
-def _run_login(timeout: int, chrome_path: str | None = None) -> None:
+def _run_login_from_browser(cdp_url: str) -> None:
+    """Read cookies from an already signed-in CDP browser (no tabs touched)."""
+    from .auth import extract_tokens_from_browser, save_tokens
+
+    try:
+        with console.status(f"Reading Google session from {cdp_url}...", spinner="dots"):
+            tokens = extract_tokens_from_browser(cdp_url)
+        save_tokens(tokens)
+    except Exception as exc:
+        console.print(f"\n[red]Login failed:[/red] {exc}", highlight=False)
+        raise
+    console.print(Panel(
+        f"[green bold]Authenticated![/green bold]  "
+        f"Saved {len(tokens.cookies)} cookies from {cdp_url}.\n"
+        + ("  CSRF token: [green]extracted[/green]\n" if tokens.csrf_token else "")
+        + ("  Session ID: [green]extracted[/green]" if tokens.session_id else ""),
+        title="[green]Login Successful[/green]",
+        border_style=SUCCESS_COLOR,
+        box=box.ROUNDED,
+        padding=(1, 2),
+    ))
+
+
+def _run_login(timeout: int, chrome_path: str | None = None, cdp_url: str | None = None) -> None:
     """Execute the Chrome CDP login flow with rich output."""
-    from .auth import extract_cookies_via_cdp, save_tokens
+    from .auth import NOTEBOOKLM_URL, extract_cookies_via_cdp, save_tokens
+
+    if cdp_url:
+        _run_login_from_browser(cdp_url)
+        return
 
     console.print(Panel(
         "[bold]Chrome Login[/bold]\n\n"
         "A Chrome window will open. Log in to your Google account\n"
-        "on notebooklm.google.com, then return here.",
+        f"on {NOTEBOOKLM_URL}, then return here.",
         border_style=BRAND_COLOR,
         box=box.ROUNDED,
         padding=(1, 2),
@@ -493,12 +520,14 @@ def _run_login(timeout: int, chrome_path: str | None = None) -> None:
         raise
 
 
-def handle_login(timeout: int, chrome_path: str | None = None) -> None:
+def handle_login(
+    timeout: int, chrome_path: str | None = None, cdp_url: str | None = None
+) -> None:
     """Login subcommand handler."""
     show_banner()
     console.print()
     try:
-        _run_login(timeout, chrome_path=chrome_path)
+        _run_login(timeout, chrome_path=chrome_path, cdp_url=cdp_url)
         console.print(Panel(
             "[bold]Next steps:[/bold]\n"
             "\n"
@@ -591,7 +620,12 @@ def handle_doctor() -> None:
     from .auth import get_chrome_path
 
     chrome = get_chrome_path()
-    checks.append(("Google Chrome", chrome is not None, chrome or "not found"))
+    cdp_env = os.environ.get("NOTEBOOKLM_CDP_URL", "")
+    checks.append((
+        "Google Chrome",
+        chrome is not None or bool(cdp_env),
+        chrome or (f"not found (using NOTEBOOKLM_CDP_URL={cdp_env})" if cdp_env else "not found"),
+    ))
 
     # Auth file exists
     from .config import AUTH_FILE
@@ -616,6 +650,27 @@ def handle_doctor() -> None:
         valid = validate_cookies(tokens.cookies)
         checks.append(("Required cookies", valid, f"{len(tokens.cookies)} cookies"))
 
+    # Live, read-only API call. Everything above only proves a file exists;
+    # this is the only check that proves Google accepts the session.
+    if tokens:
+        from .client import NotebookLMClient
+        from .config import BASE_URL
+
+        try:
+            client = NotebookLMClient(
+                cookies=tokens.cookies,
+                csrf_token=tokens.csrf_token,
+                session_id=tokens.session_id,
+                build_label=tokens.build_label,
+            )
+            try:
+                count = len(client.list_notebooks())
+            finally:
+                client.close()
+            checks.append(("Live API (list notebooks)", True, f"{count} notebooks via {BASE_URL}"))
+        except Exception as exc:
+            checks.append(("Live API (list notebooks)", False, f"{type(exc).__name__}: {exc}"))
+
     # FastMCP importable
     try:
         import fastmcp
@@ -636,6 +691,7 @@ def handle_doctor() -> None:
         console.print("[green]All checks passed![/green]")
     else:
         console.print(f"[yellow]{fail_count} issue(s) found. See above.[/yellow]")
+        sys.exit(1)
 
 
 def handle_logout() -> None:
@@ -726,6 +782,15 @@ def main() -> None:
         "--chrome-path",
         help="Path to Chrome/Chromium executable (auto-detected if omitted)",
     )
+    login_parser.add_argument(
+        "--cdp-url",
+        default=os.environ.get("NOTEBOOKLM_CDP_URL") or None,
+        help=(
+            "Read cookies from an already signed-in browser's DevTools endpoint "
+            "(e.g. http://127.0.0.1:9223) instead of launching Chrome. "
+            "No tabs are opened or touched. Env: NOTEBOOKLM_CDP_URL"
+        ),
+    )
     login_parser.add_argument("--debug", action="store_true", help="Enable debug logging")
 
     # logout
@@ -759,7 +824,7 @@ def main() -> None:
         logging.basicConfig(level=logging.DEBUG, stream=sys.stderr)
 
     if args.command == "login":
-        handle_login(args.timeout, chrome_path=args.chrome_path)
+        handle_login(args.timeout, chrome_path=args.chrome_path, cdp_url=args.cdp_url)
     elif args.command == "logout":
         handle_logout()
     elif args.command == "setup":

@@ -24,7 +24,7 @@ notebooklm-mcp-2026 acts as a local bridge between MCP clients (Claude Code, Cur
 ### Trust boundaries
 
 - **Local machine is trusted.** Credentials are stored on disk with restrictive permissions. Anyone with access to your user account can read them.
-- **Google's servers are trusted.** All API communication goes to `notebooklm.google.com` over HTTPS.
+- **Google's servers are trusted.** All API communication goes to `notebook.google.com` (formerly `notebooklm.google.com`) over HTTPS.
 - **MCP clients are trusted.** The server exposes all 9 tools to any MCP client that connects over stdio.
 - **Network is untrusted.** All HTTP requests use HTTPS. No plaintext connections.
 

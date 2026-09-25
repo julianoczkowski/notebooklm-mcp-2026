@@ -6,8 +6,12 @@ import time
 from typing import Any
 
 
-def login(timeout: int = 300) -> dict[str, Any]:
+def login(timeout: int = 300, cdp_url: str = "") -> dict[str, Any]:
     """Launch Chrome for Google login and extract authentication cookies.
+
+    If ``cdp_url`` (or the ``NOTEBOOKLM_CDP_URL`` env var) is set, no browser
+    is launched: cookies are read from that already-running, signed-in
+    browser's DevTools endpoint instead, without opening or touching tabs.
 
     This opens a Chrome window where you log in to your Google account.
     After successful login, cookies are extracted automatically via the
@@ -18,15 +22,25 @@ def login(timeout: int = 300) -> dict[str, Any]:
 
     Args:
         timeout: Maximum seconds to wait for login (default: 300).
+        cdp_url: DevTools URL of an already signed-in browser, e.g.
+            ``http://127.0.0.1:9223``.
 
     Returns:
         Status dict with cookie count on success, or error message.
     """
-    from ..auth import extract_cookies_via_cdp, save_tokens
+    import os
 
+    from ..auth import extract_cookies_via_cdp, extract_tokens_from_browser, save_tokens
+    from ..server import reset_client
+
+    cdp_url = cdp_url or os.environ.get("NOTEBOOKLM_CDP_URL", "")
     try:
-        tokens = extract_cookies_via_cdp(login_timeout=timeout)
+        if cdp_url:
+            tokens = extract_tokens_from_browser(cdp_url)
+        else:
+            tokens = extract_cookies_via_cdp(login_timeout=timeout)
         save_tokens(tokens)
+        reset_client()  # drop the cached client holding the old session
         return {
             "status": "success",
             "message": f"Authenticated successfully. Saved {len(tokens.cookies)} cookies.",
@@ -42,8 +56,9 @@ def login(timeout: int = 300) -> dict[str, Any]:
 def check_auth() -> dict[str, Any]:
     """Check if stored credentials are valid.
 
-    Loads saved tokens from disk and attempts to validate them by
-    fetching the NotebookLM homepage. No browser window is needed.
+    Loads saved tokens from disk and validates them with a real, read-only
+    API call (list notebooks). Only a successful RPC counts as
+    authenticated; a stored CSRF token or a 200 homepage is not proof.
 
     Returns:
         Status dict indicating authenticated, expired, or not found.
@@ -65,13 +80,18 @@ def check_auth() -> dict[str, Any]:
             cookies=tokens.cookies,
             csrf_token=tokens.csrf_token,
             session_id=tokens.session_id,
+            build_label=tokens.build_label,
         )
-        client.close()
+        try:
+            notebooks = client.list_notebooks()
+        finally:
+            client.close()
 
         age_hours = (time.time() - tokens.extracted_at) / 3600
         return {
             "status": "authenticated",
-            "message": "Credentials are valid.",
+            "message": "Credentials are valid (list_notebooks succeeded).",
+            "notebook_count": len(notebooks),
             "cookie_count": len(tokens.cookies),
             "age_hours": round(age_hours, 1),
         }

@@ -42,6 +42,7 @@ def get_client() -> NotebookLMClient:
             cookies=tokens.cookies,
             csrf_token=tokens.csrf_token,
             session_id=tokens.session_id,
+            build_label=tokens.build_label,
         )
     return _client
 
