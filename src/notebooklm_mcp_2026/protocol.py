@@ -60,13 +60,20 @@ def build_request_body(rpc_id: str, params: Any, csrf_token: str) -> str:
     return "&".join(parts) + "&"
 
 
-def build_url(rpc_id: str, session_id: str = "", source_path: str = "/") -> str:
+def build_url(
+    rpc_id: str,
+    session_id: str = "",
+    source_path: str = "/",
+    build_label: str = "",
+) -> str:
     """Build the batchexecute endpoint URL with query parameters.
 
     Args:
         rpc_id: The RPC method identifier.
         session_id: Optional ``FdrFJe`` session ID for affinity.
         source_path: The ``source-path`` parameter (defaults to ``"/"``).
+        build_label: Live ``bl`` value scraped from the page; falls back to
+            :data:`config.BUILD_LABEL` when empty.
 
     Returns:
         The full URL including query string.
@@ -74,7 +81,7 @@ def build_url(rpc_id: str, session_id: str = "", source_path: str = "/") -> str:
     params: dict[str, str] = {
         "rpcids": rpc_id,
         "source-path": source_path,
-        "bl": BUILD_LABEL,
+        "bl": build_label or BUILD_LABEL,
         "hl": "en",
         "rt": "c",
     }
@@ -206,10 +213,10 @@ def build_query_body(params: Any, csrf_token: str) -> str:
     return "&".join(parts) + "&"
 
 
-def build_query_url(session_id: str = "", reqid: int = 0) -> str:
+def build_query_url(session_id: str = "", reqid: int = 0, build_label: str = "") -> str:
     """Build the URL for the streaming query endpoint."""
     params: dict[str, str] = {
-        "bl": BUILD_LABEL,
+        "bl": build_label or BUILD_LABEL,
         "hl": "en",
         "_reqid": str(reqid),
         "rt": "c",

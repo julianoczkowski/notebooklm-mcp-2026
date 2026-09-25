@@ -24,8 +24,8 @@ import httpx
 from . import config
 from .auth import (
     AuthTokens,
-    extract_csrf_from_html,
-    extract_session_id_from_html,
+    SessionRejectedError,
+    fetch_page_tokens,
     load_tokens,
     save_tokens,
 )
@@ -99,10 +99,13 @@ class NotebookLMClient:
         cookies: dict[str, str],
         csrf_token: str = "",
         session_id: str = "",
+        build_label: str = "",
     ):
         self.cookies = cookies
         self.csrf_token = csrf_token
         self._session_id = session_id
+        # NOTEBOOKLM_BL (if set) wins over the value scraped from the page.
+        self._build_label = config.BUILD_LABEL_OVERRIDE or build_label
         self._client: httpx.Client | None = None
         self._conversation_cache: dict[str, list[ConversationTurn]] = {}
         self._reqid_counter = random.randint(100000, 999999)
@@ -145,42 +148,28 @@ class NotebookLMClient:
     # ------------------------------------------------------------------
 
     def _refresh_auth_tokens(self) -> None:
-        """Fetch the NotebookLM homepage and extract CSRF + session ID."""
-        jar = httpx.Cookies()
-        for name, value in self.cookies.items():
-            jar.set(name, value, domain=".google.com")
+        """Fetch the NotebookLM homepage and extract CSRF, session ID and bl.
 
-        with httpx.Client(
-            cookies=jar,
-            headers=config.PAGE_FETCH_HEADERS,
-            follow_redirects=True,
-            timeout=15.0,
-        ) as tmp:
-            resp = tmp.get(f"{config.BASE_URL}/")
+        Also picks up cookies Google rotated on that response (``SIDCC``,
+        ``__Secure-*PSIDTS``) so the saved session keeps working longer.
+        """
+        try:
+            page = fetch_page_tokens(self.cookies)
+        except SessionRejectedError as e:
+            raise AuthenticationError(
+                str(e),
+                hint="Run 'notebooklm-mcp-2026 login' to re-authenticate.",
+            ) from e
+        except RuntimeError as e:
+            raise AuthenticationError(str(e)) from e
 
-            if "accounts.google.com" in str(resp.url):
-                raise AuthenticationError(
-                    "Cookies expired — redirected to Google login.",
-                    hint="Run 'notebooklm-mcp-2026 login' to re-authenticate.",
-                )
-
-            if resp.status_code != 200:
-                raise AuthenticationError(
-                    f"Failed to fetch NotebookLM page: HTTP {resp.status_code}"
-                )
-
-            html = resp.text
-            csrf = extract_csrf_from_html(html)
-            if not csrf:
-                raise AuthenticationError(
-                    "Could not extract CSRF token from page. "
-                    "The page structure may have changed."
-                )
-            self.csrf_token = csrf
-
-            sid = extract_session_id_from_html(html)
-            if sid:
-                self._session_id = sid
+        self.cookies = page.cookies
+        self.csrf_token = page.csrf_token
+        if page.session_id:
+            self._session_id = page.session_id
+        if page.build_label and not config.BUILD_LABEL_OVERRIDE:
+            self._build_label = page.build_label
+        self.close()  # rebuild the RPC client with the rotated cookies
 
         # Persist refreshed tokens
         self._persist_tokens()
@@ -194,10 +183,11 @@ class NotebookLMClient:
                     csrf_token=self.csrf_token,
                     session_id=self._session_id,
                     extracted_at=time.time(),
+                    build_label=self._build_label,
                 )
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.warning("Could not persist refreshed auth tokens: %s", exc)
 
     # ------------------------------------------------------------------
     # RPC call with retry
@@ -223,7 +213,7 @@ class NotebookLMClient:
         """
         client = self._get_client()
         body = build_request_body(rpc_id, params, self.csrf_token)
-        url = build_url(rpc_id, self._session_id, path)
+        url = build_url(rpc_id, self._session_id, path, self._build_label)
 
         try:
             resp = client.post(url, content=body, timeout=timeout or config.DEFAULT_TIMEOUT)
@@ -294,6 +284,8 @@ class NotebookLMClient:
                 self.cookies = disk_tokens.cookies
                 self.csrf_token = disk_tokens.csrf_token
                 self._session_id = disk_tokens.session_id
+                if disk_tokens.build_label and not config.BUILD_LABEL_OVERRIDE:
+                    self._build_label = disk_tokens.build_label
             else:
                 raise
 
@@ -581,7 +573,7 @@ class NotebookLMClient:
 
         body = build_query_body(params, self.csrf_token)
         self._reqid_counter += 100000
-        url = build_query_url(self._session_id, self._reqid_counter)
+        url = build_query_url(self._session_id, self._reqid_counter, self._build_label)
 
         resp = client.post(url, content=body, timeout=timeout or config.QUERY_TIMEOUT)
         resp.raise_for_status()

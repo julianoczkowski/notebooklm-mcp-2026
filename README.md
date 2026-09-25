@@ -1,6 +1,6 @@
 [![CI](https://github.com/julianoczkowski/notebooklm-mcp-2026/actions/workflows/ci.yml/badge.svg)](https://github.com/julianoczkowski/notebooklm-mcp-2026/actions/workflows/ci.yml)
 [![MCP Server](https://img.shields.io/badge/MCP-server-7c3aed)](https://modelcontextprotocol.io)
-[![Google NotebookLM](https://img.shields.io/badge/Google-NotebookLM-4285F4)](https://notebooklm.google.com)
+[![Google NotebookLM](https://img.shields.io/badge/Google-NotebookLM-4285F4)](https://notebook.google.com)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-3776AB?logo=python&logoColor=white)](https://python.org)
 [![FastMCP](https://img.shields.io/badge/built_with-FastMCP-ff6600)](https://github.com/jlowin/fastmcp)
 [![PyPI](https://img.shields.io/pypi/v/notebooklm-mcp-2026)](https://pypi.org/project/notebooklm-mcp-2026/)

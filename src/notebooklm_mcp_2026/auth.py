@@ -25,17 +25,24 @@ from typing import Any
 
 from collections.abc import Callable
 
+from urllib.parse import urlsplit
+
 from .config import (
     AUTH_FILE,
+    BASE_URL,
     CHROME_PROFILE_DIR,
     ESSENTIAL_COOKIES,
+    HOST_SCOPED_COOKIES,
+    LEGACY_HOSTS,
+    NOTEBOOKLM_HOST,
+    PAGE_FETCH_HEADERS,
     REQUIRED_COOKIES,
     STORAGE_DIR,
 )
 
 logger = logging.getLogger("notebooklm_mcp_2026.auth")
 
-NOTEBOOKLM_URL = "https://notebooklm.google.com/"
+NOTEBOOKLM_URL = f"{BASE_URL}/"
 CDP_PORT_START = 9222
 CDP_PORT_RANGE = 10  # scan 9222–9231
 
@@ -53,6 +60,7 @@ class AuthTokens:
     csrf_token: str = ""
     session_id: str = ""
     extracted_at: float = field(default_factory=time.time)
+    build_label: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -64,6 +72,7 @@ class AuthTokens:
             csrf_token=data.get("csrf_token", ""),
             session_id=data.get("session_id", ""),
             extracted_at=data.get("extracted_at", 0.0),
+            build_label=data.get("build_label", ""),
         )
 
 
@@ -109,6 +118,124 @@ def load_tokens() -> AuthTokens | None:
 def validate_cookies(cookies: dict[str, str]) -> bool:
     """Check that all required Google auth cookies are present."""
     return REQUIRED_COOKIES.issubset(cookies.keys())
+
+
+def has_service_cookie(cookies: dict[str, str]) -> bool:
+    """Check that a NotebookLM-scoped OSID / __Secure-OSID is present."""
+    return bool(HOST_SCOPED_COOKIES & cookies.keys())
+
+
+def is_notebooklm_url(url: str) -> bool:
+    """True if *url* is on the current or a legacy NotebookLM host."""
+    host = (urlsplit(url).hostname or "").lower()
+    return host == NOTEBOOKLM_HOST or host in LEGACY_HOSTS
+
+
+def select_auth_cookies(
+    raw_cookies: list[dict], host: str = NOTEBOOKLM_HOST
+) -> dict[str, str]:
+    """Pick the cookies NotebookLM needs from a browser cookie dump.
+
+    Account-wide cookies (``SID``, ``SAPISID``, ``__Secure-1PSIDTS``, ...)
+    live on ``.google.com``. The per-service ``OSID`` / ``__Secure-OSID``
+    pair is host-only: a signed-in browser holds one per Google service
+    (``mail.google.com``, ``drive.google.com``, ``notebooklm.google.com``,
+    ``notebook.google.com``, ...). Flattening them by name, as earlier
+    versions did, keeps whichever host happened to come last, and
+    NotebookLM then answers every request with a redirect to
+    ``accounts.google.com/ServiceLogin?osid=1`` (HTTP 401 for RPCs).
+
+    Only ``.google.com`` cookies and cookies scoped exactly to *host* are
+    kept; host-scoped cookies from any other host are discarded.
+    """
+    host = host.lower()
+    account_wide: dict[str, str] = {}
+    host_scoped: dict[str, str] = {}
+    for c in raw_cookies:
+        name = c.get("name", "")
+        if name not in ESSENTIAL_COOKIES:
+            continue
+        domain = (c.get("domain") or "").lower()
+        if name in HOST_SCOPED_COOKIES:
+            if domain.lstrip(".") == host:
+                host_scoped[name] = c.get("value", "")
+        elif domain in (".google.com", "google.com"):
+            account_wide[name] = c.get("value", "")
+    return {**account_wide, **host_scoped}
+
+
+class SessionRejectedError(RuntimeError):
+    """Google redirected the cookie session to its sign-in page."""
+
+
+@dataclass
+class PageTokens:
+    """Tokens scraped from the NotebookLM page plus rotated cookies."""
+
+    csrf_token: str
+    session_id: str
+    build_label: str
+    cookies: dict[str, str]
+
+
+def fetch_page_tokens(cookies: dict[str, str], timeout: float = 15.0) -> PageTokens:
+    """GET the NotebookLM homepage with *cookies* and scrape its tokens.
+
+    Returns the CSRF token (``SNlM0e``), session ID (``FdrFJe``), live
+    build label (``cfb2h``) and the cookie dict updated with any values
+    Google rotated in ``Set-Cookie`` (``SIDCC``, ``__Secure-*PSIDTS``, ...).
+
+    Raises:
+        SessionRejectedError: Google redirected to its sign-in page.
+        RuntimeError: Non-200 response or no CSRF token on the page.
+    """
+    import httpx
+
+    jar = httpx.Cookies()
+    for name, value in cookies.items():
+        jar.set(name, value, domain=".google.com")
+
+    with httpx.Client(
+        cookies=jar,
+        headers=PAGE_FETCH_HEADERS,
+        follow_redirects=True,
+        timeout=timeout,
+    ) as tmp:
+        resp = tmp.get(NOTEBOOKLM_URL)
+        final_host = (resp.url.host or "").lower()
+        if final_host == "accounts.google.com" or resp.url.path.startswith("/login"):
+            hops = [f"{h.status_code} {h.url.host}{h.url.path}" for h in resp.history]
+            hops.append(f"{resp.status_code} {final_host}{resp.url.path}")
+            raise SessionRejectedError(
+                "Cookies rejected: NotebookLM redirected to Google sign-in "
+                f"({' -> '.join(hops)}). Re-run 'notebooklm-mcp-2026 login'."
+            )
+        if resp.status_code != 200:
+            raise RuntimeError(f"Failed to fetch NotebookLM page: HTTP {resp.status_code}")
+
+        html = resp.text
+        csrf = extract_csrf_from_html(html)
+        if not csrf:
+            raise RuntimeError(
+                "Could not extract CSRF token from page. "
+                "The page structure may have changed."
+            )
+
+        updated = dict(cookies)
+        for c in tmp.cookies.jar:
+            domain = (c.domain or "").lower()
+            if c.name in ESSENTIAL_COOKIES and c.value and (
+                domain in (".google.com", "google.com")
+                or domain.lstrip(".") == NOTEBOOKLM_HOST
+            ):
+                updated[c.name] = c.value
+
+        return PageTokens(
+            csrf_token=csrf,
+            session_id=extract_session_id_from_html(html),
+            build_label=extract_build_label_from_html(html),
+            cookies=updated,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -369,11 +496,17 @@ def extract_csrf_from_html(html: str) -> str:
 
 def extract_session_id_from_html(html: str) -> str:
     """Extract the session ID (``FdrFJe``) from page HTML."""
-    for pattern in (r'"FdrFJe":"(\d+)"', r'f\.sid["\s:=]+["\']?(\d+)'):
+    for pattern in (r'"FdrFJe":"(-?\d+)"', r'f\.sid["\s:=]+["\']?(-?\d+)'):
         match = re.search(pattern, html)
         if match:
             return match.group(1)
     return ""
+
+
+def extract_build_label_from_html(html: str) -> str:
+    """Extract the live frontend build label (``cfb2h``) from page HTML."""
+    match = re.search(r'"cfb2h":"([^"]+)"', html)
+    return match.group(1) if match else ""
 
 
 # ---------------------------------------------------------------------------
@@ -392,7 +525,7 @@ def extract_cookies_via_cdp(
     This is the primary authentication entry point. It:
 
     1. Finds an available CDP port.
-    2. Launches Chrome pointing at notebooklm.google.com.
+    2. Launches Chrome pointing at NotebookLM (``config.BASE_URL``).
     3. Waits for the user to complete Google OAuth.
     4. Extracts cookies, CSRF token, and session ID via CDP.
     5. Filters to essential cookies only.
@@ -447,27 +580,27 @@ def extract_cookies_via_cdp(
 
         # Wait for login.
         #
-        # The URL check alone is unreliable: notebooklm.google.com appears
+        # The URL check alone is unreliable: the NotebookLM host appears
         # briefly before redirecting to accounts.google.com.  Instead, we
         # poll for the *required cookies* to appear — that's the real
-        # proof that the user has finished logging in.
+        # proof that the user has finished logging in.  We also need the
+        # OSID pair scoped to the NotebookLM host, which Google only sets
+        # once the browser lands back on that host after sign-in.
         logger.info("Waiting for Google login…")
         start = time.time()
         cookies: dict[str, str] = {}
 
         while time.time() - start < login_timeout:
             try:
-                # Check if the required auth cookies exist yet
-                raw = _get_page_cookies(ws_url)
-                candidate: dict[str, str] = {}
-                for c in raw:
-                    name = c.get("name", "")
-                    domain = c.get("domain", "")
-                    if name in ESSENTIAL_COOKIES and ".google.com" in domain:
-                        candidate[name] = c.get("value", "")
-                if REQUIRED_COOKIES.issubset(candidate.keys()):
-                    cookies = candidate
-                    break
+                candidate = select_auth_cookies(_get_page_cookies(ws_url))
+                if validate_cookies(candidate):
+                    if has_service_cookie(candidate):
+                        cookies = candidate
+                        break
+                    # Signed in to Google but not yet to NotebookLM's host:
+                    # land on it so Google issues the host-scoped OSID.
+                    if (urlsplit(_get_current_url(ws_url)).hostname or "") != NOTEBOOKLM_HOST:
+                        _navigate_to_url(ws_url, NOTEBOOKLM_URL)
             except Exception:
                 pass
             time.sleep(5)
@@ -482,22 +615,24 @@ def extract_cookies_via_cdp(
         # or a consent screen after cookies are set).
         try:
             current_url = _get_current_url(ws_url)
-            if "notebooklm.google.com" not in current_url:
+            if (urlsplit(current_url).hostname or "") != NOTEBOOKLM_HOST:
                 _navigate_to_url(ws_url, NOTEBOOKLM_URL)
                 time.sleep(3)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Could not navigate back to NotebookLM: %s", exc)
 
         # Extract CSRF and session ID from page HTML
         html = _get_page_html(ws_url)
         csrf_token = extract_csrf_from_html(html)
         session_id = extract_session_id_from_html(html)
+        build_label = extract_build_label_from_html(html)
 
         return AuthTokens(
             cookies=cookies,
             csrf_token=csrf_token,
             session_id=session_id,
             extracted_at=time.time(),
+            build_label=build_label,
         )
 
     finally:
@@ -529,7 +664,7 @@ def _find_notebooklm_page(port: int, max_attempts: int = 5) -> dict | None:
     for attempt in range(max_attempts):
         pages = _get_pages(port)
         for page in pages:
-            if "notebooklm.google.com" in page.get("url", ""):
+            if is_notebooklm_url(page.get("url", "")):
                 return page
 
         # If we got pages but none match, try creating a new tab
@@ -557,3 +692,58 @@ def _find_notebooklm_page(port: int, max_attempts: int = 5) -> dict | None:
             time.sleep(2)
 
     return None
+
+
+# ---------------------------------------------------------------------------
+# Attach to an already-running, already-signed-in browser
+# ---------------------------------------------------------------------------
+
+
+def extract_tokens_from_browser(cdp_url: str) -> AuthTokens:
+    """Read auth cookies from an existing CDP browser, without touching tabs.
+
+    Connects to the browser-level DevTools endpoint at *cdp_url* (for
+    example ``http://127.0.0.1:9223`` for a Chromium browser started with
+    ``--remote-debugging-port=9223``), reads its cookie store with
+    ``Storage.getCookies``, keeps only the NotebookLM-relevant cookies (see
+    :func:`select_auth_cookies`), and fetches the CSRF token / session ID /
+    build label over plain HTTPS. No tab is opened, navigated, focused, or
+    closed, and the browser is left running.
+
+    Raises:
+        RuntimeError: Browser unreachable, not signed in to Google, or never
+            visited the NotebookLM host (no host-scoped OSID yet).
+        SessionRejectedError: Google rejected the extracted session.
+    """
+    import httpx
+
+    base = cdp_url.rstrip("/")
+    try:
+        info = httpx.get(f"{base}/json/version", timeout=5).json()
+    except Exception as exc:
+        raise RuntimeError(f"No DevTools endpoint at {base}: {exc}") from exc
+    ws_url = info.get("webSocketDebuggerUrl")
+    if not ws_url:
+        raise RuntimeError(f"{base}/json/version returned no webSocketDebuggerUrl.")
+
+    raw = execute_cdp_command(ws_url, "Storage.getCookies").get("cookies", [])
+    cookies = select_auth_cookies(raw)
+    if not validate_cookies(cookies):
+        missing = sorted(REQUIRED_COOKIES - cookies.keys())
+        raise RuntimeError(
+            f"Browser at {base} is not signed in to Google (missing {', '.join(missing)})."
+        )
+    if not has_service_cookie(cookies):
+        raise RuntimeError(
+            f"Browser at {base} has no session cookie for {NOTEBOOKLM_HOST}. "
+            f"Open {NOTEBOOKLM_URL} in that browser once, then retry."
+        )
+
+    page = fetch_page_tokens(cookies)
+    return AuthTokens(
+        cookies=page.cookies,
+        csrf_token=page.csrf_token,
+        session_id=page.session_id,
+        extracted_at=time.time(),
+        build_label=page.build_label,
+    )
