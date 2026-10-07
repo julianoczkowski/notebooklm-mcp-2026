@@ -23,7 +23,11 @@ CHROME_PROFILE_DIR = STORAGE_DIR / "chrome-profile"
 # API endpoints
 # ---------------------------------------------------------------------------
 
-BASE_URL = "https://notebooklm.google.com"
+# NotebookLM moved from notebooklm.google.com to notebook.google.com (rebranded
+# "Gemini Notebook"); the old host now 301-redirects here. Host-only cookies
+# such as OSID are issued per host, so this must match the host actually served.
+NOTEBOOKLM_HOST = "notebook.google.com"
+BASE_URL = f"https://{NOTEBOOKLM_HOST}"
 BATCHEXECUTE_URL = f"{BASE_URL}/_/LabsTailwindUi/data/batchexecute"
 QUERY_ENDPOINT = (
     "/_/LabsTailwindUi/data/"
@@ -34,7 +38,7 @@ QUERY_ENDPOINT = (
 # Build label — overridable via env var when Google rotates it
 BUILD_LABEL = os.environ.get(
     "NOTEBOOKLM_BL",
-    "boq_labs-tailwind-frontend_20260108.06_p0",
+    "boq_labs-tailwind-frontend_20261005.13_p0",
 )
 
 # ---------------------------------------------------------------------------

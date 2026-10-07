@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- NotebookLM moved to `notebook.google.com` (rebranded "Gemini Notebook");
+  `notebooklm.google.com` now 301-redirects there. Every call failed with
+  "Authentication expired after retry." even right after `login`. The server
+  now targets the new host (`config.NOTEBOOKLM_HOST`) and the default build
+  label is `boq_labs-tailwind-frontend_20261005.13_p0`
+- Login kept the wrong `OSID` cookie: cookies were picked by name, so the
+  host-only `OSID` from `accounts.google.com` or the old host could win and
+  the new host served a signed-out page. `select_essential_cookies` keeps only
+  domain-wide cookies and the NotebookLM host's own, and login re-reads them
+  after the NotebookLM page has loaded
+- Session IDs (`FdrFJe`) can be negative; they were silently dropped
+
 ## [0.2.1] - 2026-05-01
 
 ### Added
