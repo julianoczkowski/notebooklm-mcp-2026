@@ -56,7 +56,7 @@
 All constants centralized in one file:
 
 - **Paths**: `STORAGE_DIR`, `AUTH_FILE`, `CHROME_PROFILE_DIR` (via platformdirs)
-- **API**: `BASE_URL`, `BATCHEXECUTE_URL`, `QUERY_ENDPOINT`, `BUILD_LABEL`
+- **API**: `NOTEBOOKLM_HOST`, `BASE_URL`, `BATCHEXECUTE_URL`, `QUERY_ENDPOINT`, `BUILD_LABEL`
 - **RPC IDs**: `RPC_LIST_NOTEBOOKS`, `RPC_GET_NOTEBOOK`, `RPC_GET_SOURCE`, `RPC_ADD_SOURCE`, `RPC_GET_SOURCE_GUIDE`
 - **Auth**: `REQUIRED_COOKIES`, `ESSENTIAL_COOKIES`
 - **HTTP**: `DEFAULT_HEADERS`, `PAGE_FETCH_HEADERS`, `USER_AGENT`
@@ -97,8 +97,8 @@ Authentication via Chrome DevTools Protocol:
    - Wait for user login (poll URL every 5s)
    - Extract cookies via `Network.getAllCookies`
    - Extract CSRF from HTML: `"SNlM0e":"<token>"`
-   - Extract session ID: `"FdrFJe":"<id>"`
-   - Filter to essential cookies
+   - Extract session ID: `"FdrFJe":"<id>"` (signed, may be negative)
+   - Filter to essential cookies (domain-wide `.google.com` plus host-only cookies for the NotebookLM host)
    - Cleanup Chrome in `finally`
 
 2. **Credential storage**: `save_tokens()` / `load_tokens()`

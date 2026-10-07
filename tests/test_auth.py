@@ -13,6 +13,7 @@ from notebooklm_mcp_2026.auth import (
     extract_session_id_from_html,
     load_tokens,
     save_tokens,
+    select_essential_cookies,
     validate_cookies,
 )
 
@@ -119,8 +120,52 @@ class TestExtractSessionId:
         html = 'f.sid="9876543210"'
         assert extract_session_id_from_html(html) == "9876543210"
 
+    def test_extracts_negative_fdrfje(self):
+        html = '],"FdrFJe":"-7509409142960343516","GvXfVb":"5347362"'
+        assert extract_session_id_from_html(html) == "-7509409142960343516"
+
+    def test_extracts_negative_fsid_pattern(self):
+        html = 'f.sid="-9876543210"'
+        assert extract_session_id_from_html(html) == "-9876543210"
+
     def test_no_session_id(self):
         assert extract_session_id_from_html("<html>nothing</html>") == ""
+
+
+class TestSelectEssentialCookies:
+    def test_keeps_domain_wide_cookies(self):
+        raw = [
+            {"name": "SID", "domain": ".google.com", "value": "sid"},
+            {"name": "SAPISID", "domain": ".google.com", "value": "sapisid"},
+        ]
+        assert select_essential_cookies(raw) == {"SID": "sid", "SAPISID": "sapisid"}
+
+    def test_drops_non_essential_cookies(self):
+        raw = [{"name": "NID", "domain": ".google.com", "value": "nid"}]
+        assert select_essential_cookies(raw) == {}
+
+    def test_host_only_cookie_for_notebooklm_host_wins(self):
+        # Order matters for the old by-name logic: the last OSID seen won.
+        raw = [
+            {"name": "OSID", "domain": "notebook.google.com", "value": "right"},
+            {"name": "OSID", "domain": "notebooklm.google.com", "value": "old-host"},
+            {"name": "OSID", "domain": "accounts.google.com", "value": "accounts"},
+        ]
+        assert select_essential_cookies(raw) == {"OSID": "right"}
+
+    def test_host_cookie_beats_domain_wide_in_either_order(self):
+        host = {"name": "SIDCC", "domain": "notebook.google.com", "value": "host"}
+        wide = {"name": "SIDCC", "domain": ".google.com", "value": "wide"}
+        assert select_essential_cookies([host, wide]) == {"SIDCC": "host"}
+        assert select_essential_cookies([wide, host]) == {"SIDCC": "host"}
+
+    def test_other_host_only_cookies_are_ignored(self):
+        raw = [{"name": "OSID", "domain": "notebooklm.google.com", "value": "old-host"}]
+        assert select_essential_cookies(raw) == {}
+
+    def test_custom_host(self):
+        raw = [{"name": "OSID", "domain": "example.google.com", "value": "x"}]
+        assert select_essential_cookies(raw, host="example.google.com") == {"OSID": "x"}
 
 
 class TestLaunchChrome:
