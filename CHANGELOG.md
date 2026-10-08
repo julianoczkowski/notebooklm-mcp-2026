@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Automatic session refresh. Google stops accepting the extracted
+  `__Secure-1PSIDTS` cookie about two hours after login, and `RotateCookies`
+  from a plain HTTP client never returns a new one, so the server used to need
+  `login` several times a day. When a call fails on a dead session, the client
+  now re-extracts cookies from the login Chrome profile in headless mode
+  (`auth.refresh_tokens_headless`, about 20 seconds, no window), saves them and
+  retries. Newer tokens on disk are still preferred; a failed refresh is not
+  retried for 10 minutes; `NOTEBOOKLM_AUTO_REFRESH=0` turns it off
+
+### Changed
+- README: cookies were documented as lasting 2–4 weeks; the saved session
+  actually lasts about two hours
+
 ### Fixed
 - NotebookLM moved to `notebook.google.com` (rebranded "Gemini Notebook");
   `notebooklm.google.com` now 301-redirects there. Every call failed with

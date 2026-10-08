@@ -125,7 +125,7 @@ notebooklm-mcp-2026 uses Google session cookies extracted via Chrome DevTools Pr
 notebooklm-mcp-2026 login
 ```
 
-This opens Chrome, you log in to Google, and the tool saves the session cookies locally. Cookies last 2–4 weeks. When they expire, run `login` again.
+This opens Chrome, you log in to Google, and the tool saves the session cookies locally. Google stops accepting the saved session about two hours after login, so when it expires the server quietly refreshes it from the same Chrome profile in the background (headless, no window, about 20 seconds). You only need to run `login` again if that profile itself gets signed out.
 
 If Chrome can't be found automatically, the tool will show you the exact command to launch Chrome manually, or you can specify the path:
 
@@ -340,7 +340,7 @@ Run `notebooklm-mcp-2026 login` in your terminal.
 
 ### "Cookies expired" error
 
-Session cookies have a limited lifespan (2–4 weeks). Run `notebooklm-mcp-2026 login` again.
+The saved session lasts about two hours. The server refreshes it automatically from the login Chrome profile; this error means that refresh failed too, usually because the profile is signed out or `login` was using it at the time. Run `notebooklm-mcp-2026 login` again.
 
 ### "Chrome not found" error
 
@@ -381,6 +381,7 @@ notebooklm-mcp-2026 doctor
 | `NOTEBOOKLM_MCP_DATA_DIR`  | Platform default                            | Override data storage location |
 | `NOTEBOOKLM_BL`            | `boq_labs-tailwind-frontend_20261005.13_p0` | Google build label             |
 | `NOTEBOOKLM_QUERY_TIMEOUT` | `120.0`                                     | Query timeout in seconds       |
+| `NOTEBOOKLM_AUTO_REFRESH`  | `1`                                         | `0` disables headless refresh  |
 
 ## Security
 

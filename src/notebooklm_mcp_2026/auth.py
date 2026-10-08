@@ -30,6 +30,7 @@ from .config import (
     BASE_URL,
     CHROME_PROFILE_DIR,
     ESSENTIAL_COOKIES,
+    HEADLESS_REFRESH_TIMEOUT,
     NOTEBOOKLM_HOST,
     REQUIRED_COOKIES,
     STORAGE_DIR,
@@ -194,9 +195,10 @@ def _remove_stale_locks(profile_dir: Path) -> None:
             pass
 
 
-def _get_chrome_launch_args(port: int) -> list[str]:
+def _get_chrome_launch_args(port: int, headless: bool = False) -> list[str]:
     """Return Chrome CLI arguments for CDP login (without the executable)."""
     return [
+        *(["--headless=new"] if headless else []),
         f"--remote-debugging-port={port}",
         "--no-first-run",
         "--no-default-browser-check",
@@ -220,7 +222,9 @@ def _wait_for_cdp_connection(port: int, timeout: int) -> None:
     )
 
 
-def _launch_chrome(port: int, chrome_path: str | None = None) -> subprocess.Popen:
+def _launch_chrome(
+    port: int, chrome_path: str | None = None, headless: bool = False
+) -> subprocess.Popen:
     """Launch Chrome with remote debugging. Never uses ``shell=True``."""
     global _chrome_process
 
@@ -233,7 +237,7 @@ def _launch_chrome(port: int, chrome_path: str | None = None) -> subprocess.Pope
     CHROME_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
     _remove_stale_locks(CHROME_PROFILE_DIR)
 
-    args = [resolved] + _get_chrome_launch_args(port)
+    args = [resolved] + _get_chrome_launch_args(port, headless=headless)
 
     process = subprocess.Popen(
         args,
@@ -421,6 +425,7 @@ def extract_cookies_via_cdp(
     login_timeout: int = 300,
     chrome_path: str | None = None,
     on_manual_launch_needed: Callable[[int, list[str]], None] | None = None,
+    headless: bool = False,
 ) -> AuthTokens:
     """Launch Chrome, wait for the user to log in, and extract auth tokens.
 
@@ -444,6 +449,8 @@ def extract_cookies_via_cdp(
         chrome_path: Explicit path to Chrome/Chromium executable.
         on_manual_launch_needed: Called when Chrome is not found, receives
             ``(port, launch_args)`` so the caller can show manual instructions.
+        headless: Launch Chrome without a window. Only useful when the
+            profile is already signed in, since nobody can log in.
 
     Returns:
         Populated :class:`AuthTokens`.
@@ -459,8 +466,8 @@ def extract_cookies_via_cdp(
 
     try:
         if resolved:
-            chrome_proc = _launch_chrome(port, resolved)
-        elif on_manual_launch_needed:
+            chrome_proc = _launch_chrome(port, resolved, headless=headless)
+        elif on_manual_launch_needed and not headless:
             # Chrome not found — let the caller show manual instructions
             CHROME_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
             _remove_stale_locks(CHROME_PROFILE_DIR)
@@ -486,7 +493,10 @@ def extract_cookies_via_cdp(
         # briefly before redirecting to accounts.google.com.  Instead, we
         # poll for the *required cookies* to appear — that's the real
         # proof that the user has finished logging in.
-        logger.info("Waiting for Google login…")
+        if headless:
+            logger.info("Reading the Chrome profile's Google session…")
+        else:
+            logger.info("Waiting for Google login…")
         start = time.time()
         cookies: dict[str, str] = {}
 
@@ -553,6 +563,38 @@ def extract_cookies_via_cdp(
                     pass
             if _chrome_process is proc:
                 _chrome_process = None
+
+
+def refresh_tokens_headless(timeout: int = HEADLESS_REFRESH_TIMEOUT) -> AuthTokens | None:
+    """Mint fresh tokens from the login Chrome profile, with no user interaction.
+
+    The extracted ``__Secure-1PSIDTS`` cookie stops being accepted about two
+    hours after login, and only a real browser can rotate it. The Chrome
+    profile used by ``login`` stays signed in to Google far longer, so
+    opening it headless and re-running the extraction yields a working
+    session again. The new tokens are saved to disk.
+
+    Args:
+        timeout: Maximum seconds to wait for the profile's session cookies.
+
+    Returns:
+        The fresh :class:`AuthTokens`, or ``None`` when there is no profile,
+        no Chrome, the profile is signed out, or the refresh fails for any
+        other reason (for example ``login`` is using the profile right now).
+    """
+    if not CHROME_PROFILE_DIR.exists() or not get_chrome_path():
+        return None
+    try:
+        tokens = extract_cookies_via_cdp(login_timeout=timeout, headless=True)
+    except Exception as exc:  # noqa: BLE001 — any failure means "fall back to manual login"
+        logger.info("Headless session refresh failed: %s", exc)
+        return None
+    if not validate_cookies(tokens.cookies) or not tokens.csrf_token:
+        logger.info("Headless session refresh found no signed-in session in the Chrome profile.")
+        return None
+    save_tokens(tokens)
+    logger.info("Session refreshed from the login Chrome profile.")
+    return tokens
 
 
 def _find_notebooklm_page(port: int, max_attempts: int = 5) -> dict | None:

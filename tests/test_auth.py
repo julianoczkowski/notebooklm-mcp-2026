@@ -241,3 +241,68 @@ class TestLaunchChrome:
             assert result is process
         finally:
             self._exit(patches)
+
+
+class TestHeadlessRefresh:
+    def test_launch_args_headless_flag(self):
+        assert "--headless=new" in auth._get_chrome_launch_args(9222, headless=True)
+        assert "--headless=new" not in auth._get_chrome_launch_args(9222)
+
+    def _profile(self, tmp_path):
+        profile = tmp_path / "chrome-profile"
+        profile.mkdir()
+        return patch("notebooklm_mcp_2026.auth.CHROME_PROFILE_DIR", profile)
+
+    def test_success_saves_and_returns_tokens(self, sample_cookies, tmp_path):
+        tokens = AuthTokens(cookies=sample_cookies, csrf_token="csrf", session_id="-1")
+        with (
+            self._profile(tmp_path),
+            patch("notebooklm_mcp_2026.auth.get_chrome_path", return_value="/fake/chrome"),
+            patch("notebooklm_mcp_2026.auth.extract_cookies_via_cdp", return_value=tokens) as extract,
+            patch("notebooklm_mcp_2026.auth.save_tokens") as save,
+        ):
+            assert auth.refresh_tokens_headless(timeout=5) is tokens
+        extract.assert_called_once_with(login_timeout=5, headless=True)
+        save.assert_called_once_with(tokens)
+
+    def test_no_profile(self, tmp_path):
+        with (
+            patch("notebooklm_mcp_2026.auth.CHROME_PROFILE_DIR", tmp_path / "missing"),
+            patch("notebooklm_mcp_2026.auth.extract_cookies_via_cdp") as extract,
+        ):
+            assert auth.refresh_tokens_headless() is None
+        extract.assert_not_called()
+
+    def test_no_chrome(self, tmp_path):
+        with (
+            self._profile(tmp_path),
+            patch("notebooklm_mcp_2026.auth.get_chrome_path", return_value=None),
+            patch("notebooklm_mcp_2026.auth.extract_cookies_via_cdp") as extract,
+        ):
+            assert auth.refresh_tokens_headless() is None
+        extract.assert_not_called()
+
+    def test_extraction_error_returns_none(self, tmp_path):
+        with (
+            self._profile(tmp_path),
+            patch("notebooklm_mcp_2026.auth.get_chrome_path", return_value="/fake/chrome"),
+            patch(
+                "notebooklm_mcp_2026.auth.extract_cookies_via_cdp",
+                side_effect=RuntimeError("Login timed out"),
+            ),
+            patch("notebooklm_mcp_2026.auth.save_tokens") as save,
+        ):
+            assert auth.refresh_tokens_headless() is None
+        save.assert_not_called()
+
+    def test_signed_out_profile_returns_none(self, sample_cookies, tmp_path):
+        # A signed-out page has no SNlM0e, so no CSRF token is extracted.
+        tokens = AuthTokens(cookies=sample_cookies, csrf_token="", session_id="")
+        with (
+            self._profile(tmp_path),
+            patch("notebooklm_mcp_2026.auth.get_chrome_path", return_value="/fake/chrome"),
+            patch("notebooklm_mcp_2026.auth.extract_cookies_via_cdp", return_value=tokens),
+            patch("notebooklm_mcp_2026.auth.save_tokens") as save,
+        ):
+            assert auth.refresh_tokens_headless() is None
+        save.assert_not_called()

@@ -94,6 +94,24 @@ SOURCE_ADD_TIMEOUT = 120.0
 QUERY_TIMEOUT = float(os.environ.get("NOTEBOOKLM_QUERY_TIMEOUT", "120.0"))
 
 # ---------------------------------------------------------------------------
+# Session refresh
+# ---------------------------------------------------------------------------
+
+# Google stops accepting the extracted __Secure-1PSIDTS cookie about two hours
+# after login, and only a real browser can rotate it (RotateCookies from a
+# plain HTTP client never returns a new one). When a call fails on an expired
+# session, the client re-extracts cookies from the login Chrome profile in
+# headless mode, which mints a fresh session with no user interaction.
+AUTO_REFRESH = os.environ.get("NOTEBOOKLM_AUTO_REFRESH", "1").strip().lower() not in (
+    "0",
+    "false",
+    "no",
+    "off",
+)
+HEADLESS_REFRESH_TIMEOUT = 45  # seconds to wait for the profile's session cookies
+HEADLESS_REFRESH_COOLDOWN = 600.0  # seconds before retrying after a failed refresh
+
+# ---------------------------------------------------------------------------
 # HTTP headers
 # ---------------------------------------------------------------------------
 

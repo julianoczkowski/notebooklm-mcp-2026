@@ -110,10 +110,16 @@ Authentication via Chrome DevTools Protocol:
 
 `NotebookLMClient` — the single HTTP interface to Google's servers.
 
-**Auth recovery (2-layer):**
+**Auth recovery:**
 
 1. Refresh CSRF token (fetch homepage, extract from HTML)
-2. Reload cookies from disk (user may have re-logged in)
+2. If the session itself is dead: use newer tokens from disk (user may have re-logged in)
+3. Otherwise mint a new session from the login Chrome profile in headless mode
+   (`auth.refresh_tokens_headless`). The extracted `__Secure-1PSIDTS` cookie stops
+   working about two hours after login and only a browser can rotate it, while the
+   profile itself stays signed in. Skipped for 10 minutes after a failed attempt;
+   disabled with `NOTEBOOKLM_AUTO_REFRESH=0`
+4. Fall back to whatever is on disk
 
 **Server error retry:**
 
