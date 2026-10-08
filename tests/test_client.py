@@ -3,7 +3,11 @@
 import json
 from unittest.mock import MagicMock, patch
 
+import pytest
+
+from notebooklm_mcp_2026.auth import AuthTokens
 from notebooklm_mcp_2026.client import (
+    AuthenticationError,
     NotebookLMClient,
     _extract_all_text,
     _extract_source_ids,
@@ -154,3 +158,73 @@ class TestNotebookLMClientListNotebooks:
         notebooks = client.list_notebooks()
         assert notebooks == []
         client.close()
+
+
+class TestAuthRecovery:
+    """Recovery order in _retry_after_auth_refresh when the session is dead."""
+
+    def _client(self, sample_cookies):
+        client = NotebookLMClient(cookies=sample_cookies, csrf_token="old-csrf", session_id="1")
+        client._refresh_auth_tokens = MagicMock(side_effect=AuthenticationError("signed out"))
+        client._call_rpc = MagicMock(return_value="ok")
+        return client
+
+    def _tokens(self, cookies, csrf="new-csrf"):
+        return AuthTokens(cookies=cookies, csrf_token=csrf, session_id="2")
+
+    def test_headless_refresh_used_when_disk_is_unchanged(self, sample_cookies):
+        client = self._client(sample_cookies)
+        fresh = self._tokens({**sample_cookies, "SID": "fresh"})
+        with (
+            patch("notebooklm_mcp_2026.client.load_tokens", return_value=self._tokens(sample_cookies)),
+            patch("notebooklm_mcp_2026.client.refresh_tokens_headless", return_value=fresh) as refresh,
+            patch("notebooklm_mcp_2026.client.config.AUTO_REFRESH", True),
+        ):
+            assert client._retry_after_auth_refresh("rpc", [], "/", None) == "ok"
+        refresh.assert_called_once()
+        assert client.cookies["SID"] == "fresh"
+        assert client.csrf_token == "new-csrf"
+        client._call_rpc.assert_called_once_with("rpc", [], "/", None, _auth_retried=True)
+
+    def test_newer_disk_tokens_skip_headless_refresh(self, sample_cookies):
+        client = self._client(sample_cookies)
+        disk = self._tokens({**sample_cookies, "SID": "relogged"})
+        with (
+            patch("notebooklm_mcp_2026.client.load_tokens", return_value=disk),
+            patch("notebooklm_mcp_2026.client.refresh_tokens_headless") as refresh,
+        ):
+            client._retry_after_auth_refresh("rpc", [], "/", None)
+        refresh.assert_not_called()
+        assert client.cookies["SID"] == "relogged"
+
+    def test_auto_refresh_disabled(self, sample_cookies):
+        client = self._client(sample_cookies)
+        with (
+            patch("notebooklm_mcp_2026.client.load_tokens", return_value=self._tokens(sample_cookies)),
+            patch("notebooklm_mcp_2026.client.refresh_tokens_headless") as refresh,
+            patch("notebooklm_mcp_2026.client.config.AUTO_REFRESH", False),
+        ):
+            client._retry_after_auth_refresh("rpc", [], "/", None)
+        refresh.assert_not_called()
+
+    def test_failed_refresh_falls_back_to_disk_and_cools_down(self, sample_cookies):
+        client = self._client(sample_cookies)
+        with (
+            patch("notebooklm_mcp_2026.client.load_tokens", return_value=self._tokens(sample_cookies)),
+            patch("notebooklm_mcp_2026.client.refresh_tokens_headless", return_value=None) as refresh,
+            patch("notebooklm_mcp_2026.client.config.AUTO_REFRESH", True),
+        ):
+            client._retry_after_auth_refresh("rpc", [], "/", None)
+            client._retry_after_auth_refresh("rpc", [], "/", None)
+        refresh.assert_called_once()  # second failure is inside the cooldown
+        assert client._call_rpc.call_count == 2
+
+    def test_no_tokens_anywhere_raises(self, sample_cookies):
+        client = self._client(sample_cookies)
+        with (
+            patch("notebooklm_mcp_2026.client.load_tokens", return_value=None),
+            patch("notebooklm_mcp_2026.client.refresh_tokens_headless", return_value=None),
+            patch("notebooklm_mcp_2026.client.config.AUTO_REFRESH", True),
+            pytest.raises(AuthenticationError),
+        ):
+            client._retry_after_auth_refresh("rpc", [], "/", None)

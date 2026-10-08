@@ -52,7 +52,7 @@ MCP Clients (Claude Desktop, etc.)
 **Key patterns:**
 - `server.get_client()` lazy-initializes a singleton `NotebookLMClient` from disk-cached tokens
 - `protocol.py` has zero I/O — all encode/decode functions are pure and directly unit-testable
-- 2-layer auth recovery: CSRF refresh first, then full token reload from disk
+- Auth recovery: CSRF refresh first, then newer tokens from disk, then a headless re-extraction from the login Chrome profile (`refresh_tokens_headless`), then whatever is on disk
 - All tool functions return `{"status": "success"|"error", ...}` dicts
 - All constants live in `config.py` — no other module hardcodes URLs, RPC IDs, headers, or timeouts
 - CLI output goes to stderr (stdout reserved for MCP stdio transport)
@@ -81,6 +81,7 @@ MCP Clients (Claude Desktop, etc.)
 - `NOTEBOOKLM_MCP_DATA_DIR` — override storage directory
 - `NOTEBOOKLM_BL` — override Google build label when it rotates
 - `NOTEBOOKLM_QUERY_TIMEOUT` — override query timeout (default 120s)
+- `NOTEBOOKLM_AUTO_REFRESH` — set to `0` to disable the headless session refresh (default on)
 
 ## CI
 

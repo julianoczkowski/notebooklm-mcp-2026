@@ -27,6 +27,7 @@ from .auth import (
     extract_csrf_from_html,
     extract_session_id_from_html,
     load_tokens,
+    refresh_tokens_headless,
     save_tokens,
 )
 from .protocol import (
@@ -106,6 +107,7 @@ class NotebookLMClient:
         self._client: httpx.Client | None = None
         self._conversation_cache: dict[str, list[ConversationTurn]] = {}
         self._reqid_counter = random.randint(100000, 999999)
+        self._last_headless_refresh = float("-inf")
 
         # Auto-refresh CSRF token if not provided
         if not self.csrf_token:
@@ -277,6 +279,35 @@ class NotebookLMClient:
                 hint="Run 'notebooklm-mcp-2026 login' to re-authenticate.",
             )
 
+    def _apply_tokens(self, tokens: AuthTokens) -> None:
+        """Switch this client to *tokens*."""
+        self.cookies = tokens.cookies
+        self.csrf_token = tokens.csrf_token
+        self._session_id = tokens.session_id
+
+    def _refresh_session_headless(self) -> bool:
+        """Mint a new session from the login Chrome profile, if allowed.
+
+        Skipped when ``NOTEBOOKLM_AUTO_REFRESH`` is off, and for
+        ``HEADLESS_REFRESH_COOLDOWN`` seconds after the last attempt so a
+        signed-out profile does not add a Chrome launch to every call.
+
+        Returns:
+            ``True`` if this client now holds fresh tokens.
+        """
+        if not config.AUTO_REFRESH:
+            return False
+        now = time.monotonic()
+        if now - self._last_headless_refresh < config.HEADLESS_REFRESH_COOLDOWN:
+            return False
+        self._last_headless_refresh = now
+        logger.info("Session expired — refreshing it from the login Chrome profile…")
+        tokens = refresh_tokens_headless()
+        if tokens is None:
+            return False
+        self._apply_tokens(tokens)
+        return True
+
     def _retry_after_auth_refresh(
         self,
         rpc_id: str,
@@ -284,18 +315,25 @@ class NotebookLMClient:
         path: str,
         timeout: float | None,
     ) -> Any:
-        """Refresh CSRF token and retry the RPC call once."""
+        """Recover authentication and retry the RPC call once.
+
+        Recovery order: refresh the CSRF token from the page; if the session
+        itself is dead, use newer tokens from disk (the user may have run
+        ``login`` elsewhere); otherwise mint a new session from the login
+        Chrome profile in headless mode; finally fall back to whatever is on
+        disk.
+        """
         try:
             self._refresh_auth_tokens()
         except AuthenticationError:
-            # Try reloading from disk (user may have re-logged in externally)
             disk_tokens = load_tokens()
-            if disk_tokens and disk_tokens.cookies:
-                self.cookies = disk_tokens.cookies
-                self.csrf_token = disk_tokens.csrf_token
-                self._session_id = disk_tokens.session_id
-            else:
-                raise
+            if disk_tokens and disk_tokens.cookies and disk_tokens.cookies != self.cookies:
+                self._apply_tokens(disk_tokens)
+            elif not self._refresh_session_headless():
+                if disk_tokens and disk_tokens.cookies:
+                    self._apply_tokens(disk_tokens)
+                else:
+                    raise
 
         # Recreate HTTP client with fresh cookies/CSRF
         self._client = None

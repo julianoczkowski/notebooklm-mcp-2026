@@ -23,7 +23,11 @@ CHROME_PROFILE_DIR = STORAGE_DIR / "chrome-profile"
 # API endpoints
 # ---------------------------------------------------------------------------
 
-BASE_URL = "https://notebooklm.google.com"
+# NotebookLM moved from notebooklm.google.com to notebook.google.com (rebranded
+# "Gemini Notebook"); the old host now 301-redirects here. Host-only cookies
+# such as OSID are issued per host, so this must match the host actually served.
+NOTEBOOKLM_HOST = "notebook.google.com"
+BASE_URL = f"https://{NOTEBOOKLM_HOST}"
 BATCHEXECUTE_URL = f"{BASE_URL}/_/LabsTailwindUi/data/batchexecute"
 QUERY_ENDPOINT = (
     "/_/LabsTailwindUi/data/"
@@ -34,7 +38,7 @@ QUERY_ENDPOINT = (
 # Build label — overridable via env var when Google rotates it
 BUILD_LABEL = os.environ.get(
     "NOTEBOOKLM_BL",
-    "boq_labs-tailwind-frontend_20260108.06_p0",
+    "boq_labs-tailwind-frontend_20261005.13_p0",
 )
 
 # ---------------------------------------------------------------------------
@@ -88,6 +92,24 @@ ESSENTIAL_COOKIES = frozenset({
 DEFAULT_TIMEOUT = 30.0
 SOURCE_ADD_TIMEOUT = 120.0
 QUERY_TIMEOUT = float(os.environ.get("NOTEBOOKLM_QUERY_TIMEOUT", "120.0"))
+
+# ---------------------------------------------------------------------------
+# Session refresh
+# ---------------------------------------------------------------------------
+
+# Google stops accepting the extracted __Secure-1PSIDTS cookie about two hours
+# after login, and only a real browser can rotate it (RotateCookies from a
+# plain HTTP client never returns a new one). When a call fails on an expired
+# session, the client re-extracts cookies from the login Chrome profile in
+# headless mode, which mints a fresh session with no user interaction.
+AUTO_REFRESH = os.environ.get("NOTEBOOKLM_AUTO_REFRESH", "1").strip().lower() not in (
+    "0",
+    "false",
+    "no",
+    "off",
+)
+HEADLESS_REFRESH_TIMEOUT = 45  # seconds to wait for the profile's session cookies
+HEADLESS_REFRESH_COOLDOWN = 600.0  # seconds before retrying after a failed refresh
 
 # ---------------------------------------------------------------------------
 # HTTP headers

@@ -423,7 +423,7 @@ def _run_login(timeout: int, chrome_path: str | None = None) -> None:
     console.print(Panel(
         "[bold]Chrome Login[/bold]\n\n"
         "A Chrome window will open. Log in to your Google account\n"
-        "on notebooklm.google.com, then return here.",
+        "on notebook.google.com, then return here.",
         border_style=BRAND_COLOR,
         box=box.ROUNDED,
         padding=(1, 2),

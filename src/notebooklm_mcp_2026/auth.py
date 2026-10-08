@@ -27,15 +27,18 @@ from collections.abc import Callable
 
 from .config import (
     AUTH_FILE,
+    BASE_URL,
     CHROME_PROFILE_DIR,
     ESSENTIAL_COOKIES,
+    HEADLESS_REFRESH_TIMEOUT,
+    NOTEBOOKLM_HOST,
     REQUIRED_COOKIES,
     STORAGE_DIR,
 )
 
 logger = logging.getLogger("notebooklm_mcp_2026.auth")
 
-NOTEBOOKLM_URL = "https://notebooklm.google.com/"
+NOTEBOOKLM_URL = f"{BASE_URL}/"
 CDP_PORT_START = 9222
 CDP_PORT_RANGE = 10  # scan 9222–9231
 
@@ -192,9 +195,10 @@ def _remove_stale_locks(profile_dir: Path) -> None:
             pass
 
 
-def _get_chrome_launch_args(port: int) -> list[str]:
+def _get_chrome_launch_args(port: int, headless: bool = False) -> list[str]:
     """Return Chrome CLI arguments for CDP login (without the executable)."""
     return [
+        *(["--headless=new"] if headless else []),
         f"--remote-debugging-port={port}",
         "--no-first-run",
         "--no-default-browser-check",
@@ -218,7 +222,9 @@ def _wait_for_cdp_connection(port: int, timeout: int) -> None:
     )
 
 
-def _launch_chrome(port: int, chrome_path: str | None = None) -> subprocess.Popen:
+def _launch_chrome(
+    port: int, chrome_path: str | None = None, headless: bool = False
+) -> subprocess.Popen:
     """Launch Chrome with remote debugging. Never uses ``shell=True``."""
     global _chrome_process
 
@@ -231,7 +237,7 @@ def _launch_chrome(port: int, chrome_path: str | None = None) -> subprocess.Pope
     CHROME_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
     _remove_stale_locks(CHROME_PROFILE_DIR)
 
-    args = [resolved] + _get_chrome_launch_args(port)
+    args = [resolved] + _get_chrome_launch_args(port, headless=headless)
 
     process = subprocess.Popen(
         args,
@@ -369,11 +375,44 @@ def extract_csrf_from_html(html: str) -> str:
 
 def extract_session_id_from_html(html: str) -> str:
     """Extract the session ID (``FdrFJe``) from page HTML."""
-    for pattern in (r'"FdrFJe":"(\d+)"', r'f\.sid["\s:=]+["\']?(\d+)'):
+    # The ID is a signed 64-bit integer, so it can be negative.
+    for pattern in (r'"FdrFJe":"(-?\d+)"', r'f\.sid["\s:=]+["\']?(-?\d+)'):
         match = re.search(pattern, html)
         if match:
             return match.group(1)
     return ""
+
+
+def select_essential_cookies(raw: list[dict], host: str = NOTEBOOKLM_HOST) -> dict[str, str]:
+    """Pick the essential cookies that Google will accept for *host*.
+
+    Some cookie names (``OSID``, ``__Secure-OSID``) exist once per host —
+    for example on ``accounts.google.com`` and on the old
+    ``notebooklm.google.com`` — so selecting by name alone can keep a value
+    that *host* rejects, which makes every request look signed out. Only
+    domain-wide ``.google.com`` cookies and cookies for *host* itself are
+    kept, and the host's own cookie wins over a domain-wide one.
+
+    Args:
+        raw: Cookie dicts as returned by CDP ``Network.getAllCookies``.
+        host: The NotebookLM host the cookies will be sent to.
+
+    Returns:
+        Mapping of cookie name to value.
+    """
+    selected: dict[str, str] = {}
+    from_host: set[str] = set()
+    for c in raw:
+        name = c.get("name", "")
+        domain = c.get("domain", "")
+        if name not in ESSENTIAL_COOKIES:
+            continue
+        if domain == host:
+            selected[name] = c.get("value", "")
+            from_host.add(name)
+        elif domain.lstrip(".") == "google.com" and name not in from_host:
+            selected[name] = c.get("value", "")
+    return selected
 
 
 # ---------------------------------------------------------------------------
@@ -386,13 +425,14 @@ def extract_cookies_via_cdp(
     login_timeout: int = 300,
     chrome_path: str | None = None,
     on_manual_launch_needed: Callable[[int, list[str]], None] | None = None,
+    headless: bool = False,
 ) -> AuthTokens:
     """Launch Chrome, wait for the user to log in, and extract auth tokens.
 
     This is the primary authentication entry point. It:
 
     1. Finds an available CDP port.
-    2. Launches Chrome pointing at notebooklm.google.com.
+    2. Launches Chrome pointing at NotebookLM (notebook.google.com).
     3. Waits for the user to complete Google OAuth.
     4. Extracts cookies, CSRF token, and session ID via CDP.
     5. Filters to essential cookies only.
@@ -409,6 +449,8 @@ def extract_cookies_via_cdp(
         chrome_path: Explicit path to Chrome/Chromium executable.
         on_manual_launch_needed: Called when Chrome is not found, receives
             ``(port, launch_args)`` so the caller can show manual instructions.
+        headless: Launch Chrome without a window. Only useful when the
+            profile is already signed in, since nobody can log in.
 
     Returns:
         Populated :class:`AuthTokens`.
@@ -424,8 +466,8 @@ def extract_cookies_via_cdp(
 
     try:
         if resolved:
-            chrome_proc = _launch_chrome(port, resolved)
-        elif on_manual_launch_needed:
+            chrome_proc = _launch_chrome(port, resolved, headless=headless)
+        elif on_manual_launch_needed and not headless:
             # Chrome not found — let the caller show manual instructions
             CHROME_PROFILE_DIR.mkdir(parents=True, exist_ok=True)
             _remove_stale_locks(CHROME_PROFILE_DIR)
@@ -447,24 +489,21 @@ def extract_cookies_via_cdp(
 
         # Wait for login.
         #
-        # The URL check alone is unreliable: notebooklm.google.com appears
+        # The URL check alone is unreliable: notebook.google.com appears
         # briefly before redirecting to accounts.google.com.  Instead, we
         # poll for the *required cookies* to appear — that's the real
         # proof that the user has finished logging in.
-        logger.info("Waiting for Google login…")
+        if headless:
+            logger.info("Reading the Chrome profile's Google session…")
+        else:
+            logger.info("Waiting for Google login…")
         start = time.time()
         cookies: dict[str, str] = {}
 
         while time.time() - start < login_timeout:
             try:
                 # Check if the required auth cookies exist yet
-                raw = _get_page_cookies(ws_url)
-                candidate: dict[str, str] = {}
-                for c in raw:
-                    name = c.get("name", "")
-                    domain = c.get("domain", "")
-                    if name in ESSENTIAL_COOKIES and ".google.com" in domain:
-                        candidate[name] = c.get("value", "")
+                candidate = select_essential_cookies(_get_page_cookies(ws_url))
                 if REQUIRED_COOKIES.issubset(candidate.keys()):
                     cookies = candidate
                     break
@@ -482,11 +521,20 @@ def extract_cookies_via_cdp(
         # or a consent screen after cookies are set).
         try:
             current_url = _get_current_url(ws_url)
-            if "notebooklm.google.com" not in current_url:
+            if NOTEBOOKLM_HOST not in current_url:
                 _navigate_to_url(ws_url, NOTEBOOKLM_URL)
                 time.sleep(3)
         except Exception:
             pass
+
+        # Re-read the cookies now that NotebookLM itself has loaded: its
+        # host-only cookies (OSID) are only set once the page is visited.
+        try:
+            refreshed = select_essential_cookies(_get_page_cookies(ws_url))
+            if REQUIRED_COOKIES.issubset(refreshed.keys()):
+                cookies = refreshed
+        except Exception as exc:  # noqa: BLE001 — keep the cookies from the login wait
+            logger.debug("Could not re-read cookies after loading NotebookLM: %s", exc)
 
         # Extract CSRF and session ID from page HTML
         html = _get_page_html(ws_url)
@@ -517,6 +565,38 @@ def extract_cookies_via_cdp(
                 _chrome_process = None
 
 
+def refresh_tokens_headless(timeout: int = HEADLESS_REFRESH_TIMEOUT) -> AuthTokens | None:
+    """Mint fresh tokens from the login Chrome profile, with no user interaction.
+
+    The extracted ``__Secure-1PSIDTS`` cookie stops being accepted about two
+    hours after login, and only a real browser can rotate it. The Chrome
+    profile used by ``login`` stays signed in to Google far longer, so
+    opening it headless and re-running the extraction yields a working
+    session again. The new tokens are saved to disk.
+
+    Args:
+        timeout: Maximum seconds to wait for the profile's session cookies.
+
+    Returns:
+        The fresh :class:`AuthTokens`, or ``None`` when there is no profile,
+        no Chrome, the profile is signed out, or the refresh fails for any
+        other reason (for example ``login`` is using the profile right now).
+    """
+    if not CHROME_PROFILE_DIR.exists() or not get_chrome_path():
+        return None
+    try:
+        tokens = extract_cookies_via_cdp(login_timeout=timeout, headless=True)
+    except Exception as exc:  # noqa: BLE001 — any failure means "fall back to manual login"
+        logger.info("Headless session refresh failed: %s", exc)
+        return None
+    if not validate_cookies(tokens.cookies) or not tokens.csrf_token:
+        logger.info("Headless session refresh found no signed-in session in the Chrome profile.")
+        return None
+    save_tokens(tokens)
+    logger.info("Session refreshed from the login Chrome profile.")
+    return tokens
+
+
 def _find_notebooklm_page(port: int, max_attempts: int = 5) -> dict | None:
     """Find an existing NotebookLM page or create one.
 
@@ -529,7 +609,7 @@ def _find_notebooklm_page(port: int, max_attempts: int = 5) -> dict | None:
     for attempt in range(max_attempts):
         pages = _get_pages(port)
         for page in pages:
-            if "notebooklm.google.com" in page.get("url", ""):
+            if NOTEBOOKLM_HOST in page.get("url", ""):
                 return page
 
         # If we got pages but none match, try creating a new tab
